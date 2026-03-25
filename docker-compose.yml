@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: sehati-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+  mysql:
+    image: mysql:8.0
+    container_name: sehati-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: Sehati_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "-uroot", "-proot", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: sehati-phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
+
+  backend:
+    build:
+      context: ./sehati
+    container_name: sehati-backend
+    ports:
+      - "6060:6060"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/Sehati_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SEHATI_APP_JWTSECRET=q3t6w9z$C&F)J@NcQfTjWnZr4u7x!A%D*G-KaPdSgUkXp2s5v8y/B?E(H+MbQeTh
+      - SEHATI_APP_JWTEXPIRATIONMS=86400000
+      - SPRING_MAIL_HOST=smtp.gmail.com
+      - SPRING_MAIL_PORT=587
+      - SPRING_MAIL_USERNAME=sehhati.plus@gmail.com
+      - SPRING_MAIL_PASSWORD=jnpz miiq tysw axkc
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+      - CLOUDINARY_CLOUD_NAME=dbwruk8kt
+      - CLOUDINARY_API_KEY=618329299139744
+      - CLOUDINARY_API_SECRET=_FqZPiHkdG3ghrCozlOQEEnxmwg
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./sehati-front
+    container_name: sehati-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  redis_data:
