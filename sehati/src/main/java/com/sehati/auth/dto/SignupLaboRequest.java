@@ -15,28 +15,18 @@ public class SignupLaboRequest {
     private String nomLabo;
 
     private String adresseComplete;
-
-    @NotBlank(message = "La ville est obligatoire")
     private String ville;
+    private java.util.List<String> phones;
 
     @NotBlank(message = "L'email est obligatoire")
     @Email(message = "Veuillez saisir une adresse email valide.")
     private String email;
-
-    @NotBlank(message = "Le téléphone est obligatoire")
-    @Pattern(regexp = "^\\d{8}$", message = "Le numéro doit contenir uniquement 8 chiffres.")
-    private String telephone;
 
     @NotEmpty(message = "Au moins une analyse doit être ajoutée")
     private List<String> analyses;
 
     @NotBlank(message = "Le registre de commerce est obligatoire")
     private String registreCommerceUrl;
-
-    @NotBlank(message = "L'autorisation d'exercice est obligatoire")
-    private String autorisationUrl;
-
-    private String certificationUrl;
 
     @NotBlank(message = "Le mot de passe est obligatoire")
     @Size(min = 8, message = "Le mot de passe doit contenir au moins 8 caractères")

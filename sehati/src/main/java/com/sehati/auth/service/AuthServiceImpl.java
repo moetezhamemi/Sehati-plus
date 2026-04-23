@@ -5,10 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
+import com.sehati.common.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -17,12 +16,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
 import com.sehati.auth.dto.ForgotPasswordRequest;
 import com.sehati.auth.dto.GoogleAuthRequest;
 import com.sehati.auth.dto.JwtResponse;
 import com.sehati.auth.dto.LoginRequest;
-import com.sehati.auth.dto.MessageResponse;
 import com.sehati.auth.dto.ResetPasswordOtpRequest;
 import com.sehati.auth.dto.SignupLaboRequest;
 import com.sehati.auth.dto.SignupMedecinRequest;
@@ -33,12 +30,9 @@ import com.sehati.auth.repositories.RoleRepository;
 import com.sehati.auth.repositories.UserRepository;
 import com.sehati.auth.security.JwtUtils;
 import com.sehati.auth.security.UserDetailsImpl;
-import com.sehati.laboratoire.entities.Laboratoire;
-import com.sehati.laboratoire.repository.LaboratoireRepository;
-import com.sehati.medecin.entities.Medecin;
-import com.sehati.medecin.repository.MedecinRepository;
-import com.sehati.patient.entities.Patient;
-import com.sehati.patient.repository.PatientRepository;
+import com.sehati.laboratoire.service.LaboratoireService;
+import com.sehati.medecin.service.MedecinService;
+import com.sehati.patient.service.PatientService;
 
 import jakarta.transaction.Transactional;
 
@@ -50,34 +44,37 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final PatientRepository patientRepository;
-    private final MedecinRepository medecinRepository;
-    private final LaboratoireRepository laboratoireRepository;
+    private final PatientService patientService;
+    private final MedecinService medecinService;
+    private final LaboratoireService laboratoireService;
     private final PasswordEncoder encoder;
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
     private final OtpService otpService;
+    private final com.sehati.secretaire.repository.MedecinSecretaireRepository medecinSecretaireRepository;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            UserRepository userRepository,
                            RoleRepository roleRepository,
-                           PatientRepository patientRepository,
-                           MedecinRepository medecinRepository,
-                           LaboratoireRepository laboratoireRepository,
+                           PatientService patientService,
+                           MedecinService medecinService,
+                           LaboratoireService laboratoireService,
                            PasswordEncoder encoder,
                            JwtUtils jwtUtils,
                            EmailService emailService,
-                           OtpService otpService) {
+                           OtpService otpService,
+                           com.sehati.secretaire.repository.MedecinSecretaireRepository medecinSecretaireRepository) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
-        this.patientRepository = patientRepository;
-        this.medecinRepository = medecinRepository;
-        this.laboratoireRepository = laboratoireRepository;
+        this.patientService = patientService;
+        this.medecinService = medecinService;
+        this.laboratoireService = laboratoireService;
         this.encoder = encoder;
         this.jwtUtils = jwtUtils;
         this.emailService = emailService;
         this.otpService = otpService;
+        this.medecinSecretaireRepository = medecinSecretaireRepository;
     }
 
     @Override
@@ -91,11 +88,11 @@ public class AuthServiceImpl implements AuthService {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
         if (!userDetails.getIsEmailVerified()) {
-            throw new RuntimeException("Error: Email is not verified.");
+            throw new BusinessException("Error: Email is not verified.");
         }
 
         if (!userDetails.isEnabled()) {
-            throw new RuntimeException("Error: Account is pending admin approval.");
+            throw new BusinessException("Error: Account is pending admin approval.");
         }
 
         List<String> roles = userDetails.getAuthorities().stream()
@@ -116,10 +113,10 @@ public class AuthServiceImpl implements AuthService {
 
     private void checkEmailAndPasswords(String email, String password, String confirmPassword) {
         if (userRepository.existsByEmail(email)) {
-            throw new RuntimeException("Error: Email is already in use!");
+            throw new BusinessException("Error: Email is already in use!");
         }
         if (!password.equals(confirmPassword)) {
-            throw new RuntimeException("Error: Passwords do not match!");
+            throw new BusinessException("Error: Passwords do not match!");
         }
     }
 
@@ -144,93 +141,64 @@ public class AuthServiceImpl implements AuthService {
             logger.info("Verification OTP email sent to {}", savedUser.getEmail());
         } catch (Exception e) {
             logger.error("Failed to send verification email to {}", savedUser.getEmail(), e);
-            throw new RuntimeException("Erreur lors de l'envoi de l'email de vérification. " + e.getMessage());
+            throw new BusinessException("Erreur lors de l'envoi de l'email de vérification. " + e.getMessage());
         }
         return savedUser;
     }
 
     @Override
     @Transactional
-    public MessageResponse registerPatient(SignupPatientRequest signUpRequest) {
+    public String registerPatient(SignupPatientRequest signUpRequest) {
         checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(), signUpRequest.getConfirmPassword());
 
         User user = createUser(signUpRequest.getEmail(), signUpRequest.getPassword(), "PATIENT", true, "APPROVED");
         User savedUser = saveUserAndSendOtp(user);
 
-        Patient patient = new Patient();
-        patient.setNom(signUpRequest.getNom());
-        patient.setPrenom(signUpRequest.getPrenom());
-        patient.setTelephone(signUpRequest.getTelephone());
-        patient.setDateNaissance(signUpRequest.getDateNaissance());
-        patient.setUser(savedUser);
-        patientRepository.save(patient);
+        patientService.createPatientOrchestrator(savedUser, signUpRequest);
 
         logger.info("Registered new PATIENT user: {}", savedUser.getEmail());
 
-        return new MessageResponse("Un email de vérification vous a été envoyé, veuillez confirmer votre email.");
+        return "Un email de vérification vous a été envoyé, veuillez confirmer votre email.";
     }
 
     @Override
     @Transactional
-    public MessageResponse registerMedecin(SignupMedecinRequest signUpRequest) {
+    public String registerMedecin(SignupMedecinRequest signUpRequest) {
         checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(), signUpRequest.getConfirmPassword());
 
         User user = createUser(signUpRequest.getEmail(), signUpRequest.getPassword(), "MEDECIN", false, "PENDING");
         User savedUser = saveUserAndSendOtp(user);
 
-        Medecin medecin = new Medecin();
-        medecin.setNom(signUpRequest.getNom());
-        medecin.setPrenom(signUpRequest.getPrenom());
-        medecin.setSpecialite(signUpRequest.getSpecialite());
-        medecin.setAdresseCabinet(signUpRequest.getAdresseCabinet());
-        medecin.setVille(signUpRequest.getVille());
-        medecin.setTelephone(signUpRequest.getTelephone());
-        medecin.setDiplomeUrl(signUpRequest.getDiplomeUrl());
-        medecin.setLatitude(signUpRequest.getLatitude());
-        medecin.setLongitude(signUpRequest.getLongitude());
-        medecin.setUser(savedUser);
-        medecinRepository.save(medecin);
+        medecinService.createMedecinProfile(savedUser, signUpRequest);
 
         logger.info("Registered new MEDECIN user (Pending): {}", savedUser.getEmail());
 
-        return new MessageResponse("Un email de validation a été envoyé, veuillez confirmer votre email.");
+        return "Un email de validation a été envoyé, veuillez confirmer votre email.";
     }
 
     @Override
     @Transactional
-    public MessageResponse registerLaboratoire(SignupLaboRequest signUpRequest) {
+    public String registerLaboratoire(SignupLaboRequest signUpRequest) {
         checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(), signUpRequest.getConfirmPassword());
 
         User user = createUser(signUpRequest.getEmail(), signUpRequest.getPassword(), "LABORATOIRE", false, "PENDING");
         User savedUser = saveUserAndSendOtp(user);
 
-        Laboratoire labo = new Laboratoire();
-        labo.setNomLabo(signUpRequest.getNomLabo());
-        labo.setAdresseComplete(signUpRequest.getAdresseComplete());
-        labo.setVille(signUpRequest.getVille());
-        labo.setTelephone(signUpRequest.getTelephone());
-        labo.setAnalyses(signUpRequest.getAnalyses());
-        labo.setRegistreCommerceUrl(signUpRequest.getRegistreCommerceUrl());
-        labo.setAutorisationUrl(signUpRequest.getAutorisationUrl());
-        labo.setCertificationUrl(signUpRequest.getCertificationUrl());
-        labo.setLatitude(signUpRequest.getLatitude());
-        labo.setLongitude(signUpRequest.getLongitude());
-        labo.setUser(savedUser);
-        laboratoireRepository.save(labo);
+        laboratoireService.createLaboratoireProfile(savedUser, signUpRequest);
 
         logger.info("Registered new LABORATOIRE user (Pending): {}", savedUser.getEmail());
 
-        return new MessageResponse("Un email de validation a été envoyé, veuillez confirmer votre email.");
+        return "Un email de validation a été envoyé, veuillez confirmer votre email.";
     }
 
     @Override
     @Transactional
-    public MessageResponse sendOtp(String email, String purpose) {
+    public String sendOtp(String email, String purpose) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Aucun compte trouvé avec cet email."));
+                .orElseThrow(() -> new BusinessException("Aucun compte trouvé avec cet email."));
 
         if ("EMAIL_VERIFICATION".equals(purpose) && Boolean.TRUE.equals(user.getIsEmailVerified())) {
-            throw new RuntimeException("Cet email est déjà vérifié.");
+            throw new BusinessException("Cet email est déjà vérifié.");
         }
 
         try {
@@ -241,10 +209,10 @@ public class AuthServiceImpl implements AuthService {
                 emailService.sendVerificationEmail(email, otp);
             }
             logger.info("Sent OTP for {} to {}", purpose, email);
-            return new MessageResponse("Un email avec le code a été envoyé.");
+            return "Un email avec le code a été envoyé.";
         } catch (Exception e) {
             logger.error("Failed to send OTP to {}", email, e);
-            throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "Erreur lors de l'envoi de l'email.");
+            throw new BusinessException(e.getMessage() != null ? e.getMessage() : "Erreur lors de l'envoi de l'email.");
         }
     }
 
@@ -252,15 +220,15 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public java.util.Map<String, Object> verifyEmailOtp(String email, String otp) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Aucun compte trouvé avec cet email."));
+                .orElseThrow(() -> new BusinessException("Aucun compte trouvé avec cet email."));
 
         OtpValidationResult result = otpService.validateAndInvalidate(email, "EMAIL_VERIFICATION", otp);
         if (result == OtpValidationResult.EXPIRED) {
-            throw new RuntimeException("Ce code est expiré. Veuillez demander un nouveau code.");
+            throw new BusinessException("Ce code est expiré. Veuillez demander un nouveau code.");
         } else if (result == OtpValidationResult.MAX_ATTEMPTS_REACHED) {
-            throw new RuntimeException("Trop de tentatives. Veuillez demander un nouveau code.");
+            throw new BusinessException("Trop de tentatives. Veuillez demander un nouveau code.");
         } else if (result == OtpValidationResult.INVALID) {
-            throw new RuntimeException("Code incorrect.");
+            throw new BusinessException("Code incorrect.");
         }
 
         user.setIsEmailVerified(true);
@@ -273,18 +241,39 @@ public class AuthServiceImpl implements AuthService {
         response.put("message", "Votre email a été vérifié avec succès.");
         response.put("role", role);
         response.put("status", status);
+
+        // If the user is already approved (e.g., Patients), generate a token for automatic login
+        if ("APPROVED".equals(status)) {
+            UserDetailsImpl userDetails = UserDetailsImpl.build(user);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            String jwt = jwtUtils.generateJwtToken(authentication);
+            response.put("token", jwt);
+            response.put("id", userDetails.getId());
+            response.put("email", userDetails.getEmail());
+
+            List<String> roles = userDetails.getAuthorities().stream()
+                    .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                    .collect(Collectors.toList());
+            response.put("roles", roles);
+
+            logger.info("Auto-login generated for user: {}, roles: {}", email, roles);
+        }
+
         return response;
     }
 
     @Override
     @Transactional
-    public MessageResponse resendVerificationEmail(String email) {
+    public String resendVerificationEmail(String email) {
         return sendOtp(email, "EMAIL_VERIFICATION");
     }
 
     @Override
     @Transactional
-    public MessageResponse forgotPassword(ForgotPasswordRequest request) {
+    public String forgotPassword(ForgotPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail()).orElse(null);
         if (user != null) {
             try {
@@ -293,37 +282,37 @@ public class AuthServiceImpl implements AuthService {
                 logger.info("Password reset OTP email sent to {}", user.getEmail());
             } catch (Exception e) {
                 logger.error("Failed to send password reset OTP to {}", user.getEmail(), e);
-                throw new RuntimeException(e.getMessage());
+                throw new BusinessException(e.getMessage());
             }
         } else {
             logger.warn("Password reset OTP requested for non-existing email: {}", request.getEmail());
         }
-        return new MessageResponse("Si cette adresse email est associée à un compte, un code avec des instructions vous sera envoyé.");
+        return "Si cette adresse email est associée à un compte, un code avec des instructions vous sera envoyé.";
     }
 
     @Override
     @Transactional
-    public MessageResponse resetPassword(ResetPasswordOtpRequest request) {
+    public String resetPassword(ResetPasswordOtpRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Aucun compte trouvé."));
+                .orElseThrow(() -> new BusinessException("Aucun compte trouvé."));
 
         OtpValidationResult result = otpService.validateAndInvalidate(request.getEmail(), "PASSWORD_RESET", request.getOtp());
         if (result == OtpValidationResult.EXPIRED) {
-            throw new RuntimeException("Ce code est expiré. Veuillez demander une nouvelle réinitialisation.");
+            throw new BusinessException("Ce code est expiré. Veuillez demander une nouvelle réinitialisation.");
         } else if (result == OtpValidationResult.MAX_ATTEMPTS_REACHED) {
-            throw new RuntimeException("Trop de tentatives. Veuillez demander une nouvelle réinitialisation.");
+            throw new BusinessException("Trop de tentatives. Veuillez demander une nouvelle réinitialisation.");
         } else if (result == OtpValidationResult.INVALID) {
-            throw new RuntimeException("Code incorrect.");
+            throw new BusinessException("Code incorrect.");
         }
 
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new RuntimeException("Les mots de passe ne correspondent pas.");
+            throw new BusinessException("Les mots de passe ne correspondent pas.");
         }
 
         user.setPassword(encoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
-        return new MessageResponse("Votre mot de passe a été modifié avec succès. Vous pouvez maintenant vous connecter.");
+        return "Votre mot de passe a été modifié avec succès. Vous pouvez maintenant vous connecter.";
     }
 
     @Override
@@ -337,17 +326,17 @@ public class AuthServiceImpl implements AuthService {
             googlePayload = restTemplate.getForObject(googleTokenInfoUrl, Map.class);
         } catch (Exception e) {
             logger.error("Failed to validate Google token", e);
-            throw new RuntimeException("Token Google invalide ou expiré. Veuillez réessayer.");
+            throw new BusinessException("Token Google invalide ou expiré. Veuillez réessayer.");
         }
 
         if (googlePayload == null || googlePayload.containsKey("error_description")) {
-            throw new RuntimeException("Token Google invalide. Veuillez réessayer.");
+            throw new BusinessException("Token Google invalide. Veuillez réessayer.");
         }
 
         String email = (String) googlePayload.get("email");
 
         if (email == null || email.isBlank()) {
-            throw new RuntimeException("Impossible de récupérer l'email depuis le compte Google.");
+            throw new BusinessException("Impossible de récupérer l'email depuis le compte Google.");
         }
 
         User user = userRepository.findByEmail(email).orElseGet(() -> {
@@ -356,11 +345,11 @@ public class AuthServiceImpl implements AuthService {
             newUser.setVerificationToken(null);
             User savedUser = userRepository.save(newUser);
 
-            Patient patient = new Patient();
-            patient.setPrenom((String) googlePayload.getOrDefault("given_name", ""));
-            patient.setNom((String) googlePayload.getOrDefault("family_name", ""));
-            patient.setUser(savedUser);
-            patientRepository.save(patient);
+            patientService.createPatientFromGoogle(
+                savedUser,
+                (String) googlePayload.getOrDefault("given_name", ""),
+                (String) googlePayload.getOrDefault("family_name", "")
+            );
             
             logger.info("Created new patient from Google login: {}", email);
 
@@ -379,5 +368,98 @@ public class AuthServiceImpl implements AuthService {
 
         String jwt = jwtUtils.generateJwtToken(authentication);
         return new JwtResponse(jwt, userDetails.getId(), userDetails.getEmail(), roles);
+    }
+
+    @Override
+    @Transactional
+    public void updatePassword(Long userId, String oldPassword, String newPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Utilisateur non trouvé."));
+
+        if (!encoder.matches(oldPassword, user.getPassword())) {
+            throw new BusinessException("Le mot de passe actuel est incorrect.");
+        }
+
+        user.setPassword(encoder.encode(newPassword));
+        userRepository.save(user);
+        logger.info("Password updated for user id: {}", userId);
+    }
+
+    @Override
+    @Transactional
+    public com.sehati.auth.dto.SecretaireTokenCheckResponse checkSecretaireToken(String token) {
+        User user = userRepository.findByVerificationToken(token)
+                .orElseThrow(() -> new BusinessException("Jeton d'invitation invalide ou expiré."));
+
+        boolean hasPassword = user.getPassword() != null && !user.getPassword().isEmpty();
+
+        if (!hasPassword) {
+            return com.sehati.auth.dto.SecretaireTokenCheckResponse.builder().needsSetup(true).build();
+        }
+
+        // Le compte a déjà un mot de passe -> auto login
+        user.setVerificationToken(null);
+        userRepository.save(user);
+
+        UserDetailsImpl userDetails = UserDetailsImpl.build(user);
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        logger.info("Auto-login generated for existing secretaire via token: {}", user.getEmail());
+
+        JwtResponse jwtResponse = new JwtResponse(jwt, userDetails.getId(), user.getEmail(), roles);
+        return com.sehati.auth.dto.SecretaireTokenCheckResponse.builder()
+                .needsSetup(false)
+                .authData(jwtResponse)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public JwtResponse setupSecretairePassword(com.sehati.auth.dto.SecretaireSetupPasswordRequest request) {
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new BusinessException("Les mots de passe ne correspondent pas.");
+        }
+
+        User user = userRepository.findByVerificationToken(request.getToken())
+                .orElseThrow(() -> new BusinessException("Jeton d'invitation invalide ou expiré."));
+
+        user.setPassword(encoder.encode(request.getPassword()));
+        user.setEnabled(true);
+        user.setStatus("APPROVED");
+        user.setIsEmailVerified(true);
+        user.setVerificationToken(null);
+        userRepository.save(user);
+
+        // Activer la relation MedecinSecretaire PENDING → ACTIVE
+        medecinSecretaireRepository.findBySecretaireUserIdAndStatus(user.getId(), "PENDING")
+                .ifPresent(relation -> {
+                    relation.setStatus("ACTIVE");
+                    medecinSecretaireRepository.save(relation);
+                    logger.info("Relation MedecinSecretaire activée pour la secrétaire user ID: {}", user.getId());
+                });
+
+        // Auto login
+        UserDetailsImpl userDetails = UserDetailsImpl.build(user);
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        logger.info("Auto-login generated for secretaire setup: {}, roles: {}", user.getEmail(), roles);
+
+        return new JwtResponse(jwt, userDetails.getId(), user.getEmail(), roles);
     }
 }

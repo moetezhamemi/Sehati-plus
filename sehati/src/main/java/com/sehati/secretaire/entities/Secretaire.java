@@ -1,7 +1,6 @@
 package com.sehati.secretaire.entities;
 
 import com.sehati.auth.entities.User;
-import com.sehati.medecin.entities.Medecin;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -13,6 +12,7 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -27,11 +27,7 @@ public class Secretaire {
     private String prenom;
 
     @OneToOne
-    @JoinColumn(name = "medecin_id") 
-    private Medecin medecin;
-
-    @OneToOne
     @JoinColumn(name = "user_id")
     private User user;
-
 }
+

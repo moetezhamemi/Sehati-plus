@@ -20,20 +20,13 @@ public class SignupMedecinRequest {
     private String specialite;
 
     private String adresseCabinet;
-
-    @NotBlank(message = "La ville est obligatoire")
     private String ville;
+    private java.util.List<String> phones;
+    private String diplomeUrl;
 
     @NotBlank(message = "L'email est obligatoire")
     @Email(message = "L'email doit être valide")
     private String email;
-
-    @NotBlank(message = "Le téléphone est obligatoire")
-    @Pattern(regexp = "^\\d{8}$", message = "Le numéro doit contenir uniquement 8 chiffres")
-    private String telephone;
-
-    @NotBlank(message = "Le diplôme est obligatoire")
-    private String diplomeUrl;
 
     @NotBlank(message = "Le mot de passe est obligatoire")
     @Size(min = 8, message = "Le mot de passe doit contenir au moins 8 caractères")

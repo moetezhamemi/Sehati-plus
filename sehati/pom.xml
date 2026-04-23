@@ -130,6 +130,19 @@
 			<artifactId>cloudinary-http44</artifactId>
 			<version>1.36.0</version>
 		</dependency>
+		
+		<!-- HTML Template Engine -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+
+		<!-- HTML to PDF conversion -->
+		<dependency>
+			<groupId>com.openhtmltopdf</groupId>
+			<artifactId>openhtmltopdf-pdfbox</artifactId>
+			<version>1.0.10</version>
+		</dependency>
 	</dependencies>
 
 	<build>

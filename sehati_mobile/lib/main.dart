@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:sehati_mobile/theme/app_colors.dart';
-import 'screens/login_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:sehati_mobile/features/auth/screens/login_screen.dart';
+import 'package:sehati_mobile/core/theme/app_colors.dart';
+import 'package:sehati_mobile/features/auth/services/auth_service.dart';
+import 'package:sehati_mobile/features/patient/screens/patient_dashboard_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -12,44 +16,30 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sehhati+',
+      title: 'Sehati+',
       debugShowCheckedModeBanner: false,
-      showPerformanceOverlay: false,
-      showSemanticsDebugger: false,
-      debugShowMaterialGrid: false,
       theme: ThemeData(
-        primaryColor: const Color(0xFF2A7DE1),
-        scaffoldBackgroundColor: const Color(0xFFF5F9FF),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2A7DE1),
-          primary: const Color(0xFF2A7DE1),
-          secondary: const Color(0xFF87B7E8),
-          surface: const Color(0xFFF5F9FF),
-          error: const Color(0xFFEA5455),
-          onPrimary: Colors.white,
-          onSecondary: Colors.black,
-          onSurface: AppColors.textDark,
-          onError: Colors.white,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
         useMaterial3: true,
-        fontFamily: 'Inter',
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF2A7DE1),
-          foregroundColor: Colors.white,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2A7DE1),
-            foregroundColor: Colors.white,
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFF2A7DE1),
-          ),
-        ),
+        scaffoldBackgroundColor: AppColors.background,
+        textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme),
       ),
-      home: LoginScreen(),
+      home: FutureBuilder<bool>(
+        future: AuthService().isLoggedIn(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasData && snapshot.data == true) {
+            // Utilisateur connecté, on redirige vers le dashboard patient par défaut
+            return const PatientDashboardScreen();
+          }
+          // Non connecté
+          return LoginScreen();
+        },
+      ),
     );
   }
 }

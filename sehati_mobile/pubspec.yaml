@@ -39,6 +39,8 @@ dependencies:
   google_sign_in: ^6.2.2
   flutter_secure_storage: ^9.2.4
   sign_in_button: ^3.2.0
+  google_fonts: ^8.0.2
+  flutter_svg: ^2.0.10+1
 
 dev_dependencies:
   flutter_test:
@@ -50,6 +52,16 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.1
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: "assets/logo.png"
+  android: true
+  ios: true
+  android_12:
+    color: "#ffffff"
+    image: "assets/logo.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
