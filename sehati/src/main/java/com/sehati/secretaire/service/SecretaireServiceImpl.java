@@ -138,8 +138,9 @@ public class SecretaireServiceImpl implements SecretaireService {
             alreadyHasPassword = false; // Nouveau compte, toujours besoin du setup
         }
 
-        // Si le compte a déjà un MDP → relation ACTIVE directement, sinon PENDING
-        String initialStatus = alreadyHasPassword ? "ACTIVE" : "PENDING";
+        // Toujours créer l'invitation en PENDING. 
+        // Elle passera ACTIVE quand la secrétaire se connectera ou cliquera sur le lien.
+        String initialStatus = "PENDING";
 
         MedecinSecretaire relation = MedecinSecretaire.builder()
                 .medecin(medecin)
@@ -150,7 +151,7 @@ public class SecretaireServiceImpl implements SecretaireService {
 
         // Envoyer l'email d'invitation
         String medecinName = medecin.getNom() + " " + medecin.getPrenom();
-        emailService.sendSecretaireInvitationEmail(request.getEmail(), medecinName, invitationToken);
+        emailService.sendSecretaireInvitationEmail(request.getEmail(), medecinName, invitationToken, alreadyHasPassword);
 
         log.info("Invitation envoyée à {} (secretaire ID: {}) par le médecin {}", request.getEmail(), secretaire.getId(), medecin.getId());
 

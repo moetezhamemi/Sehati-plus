@@ -6,6 +6,8 @@ import com.sehati.appointment.repository.AppointmentRepository;
 import com.sehati.auth.dto.SignupPatientRequest;
 import com.sehati.auth.entities.User;
 import com.sehati.auth.repositories.UserRepository;
+import com.sehati.common.exception.BusinessException;
+import com.sehati.common.exception.PhoneVerificationRequiredException;
 import com.sehati.patient.entities.Patient;
 import com.sehati.patient.repository.PatientRepository;
 import com.sehati.medecin.repository.MedecinRepository;
@@ -18,18 +20,23 @@ import com.sehati.patient.dto.PatientHistoryDTO;
 import com.sehati.patient.dto.PatientProfileDTO;
 import com.sehati.patient.dto.ProfessionalPatientDTO;
 import com.sehati.common.service.CloudinaryService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 
 @Service
 @Transactional(readOnly = true)
 public class PatientService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PatientService.class);
 
     private final PatientRepository patientRepository;
     private final MedecinRepository medecinRepository;
@@ -193,6 +200,21 @@ public class PatientService {
         Patient patient = patientRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Patient non trouvé"));
 
+        // Vérification unicité téléphone si le numéro change
+        if (dto.getTelephone() != null && !dto.getTelephone().equals(patient.getTelephone())) {
+            Optional<Patient> existing = patientRepository.findFirstByTelephone(dto.getTelephone());
+            if (existing.isPresent() && !existing.get().getId().equals(patient.getId())) {
+                if (existing.get().getUser() != null) {
+                    // Patient avec un compte existant → bloquer
+                    throw new BusinessException("Ce numéro de téléphone est déjà associé à un compte existant.");
+                }
+                // Patient orphelin (sans User) → nécessite vérification SMS pour fusion
+                throw new PhoneVerificationRequiredException(
+                        "Un dossier médical existe avec ce numéro.",
+                        existing.get().getId());
+            }
+        }
+
         if (dto.getNom() != null)
             patient.setNom(dto.getNom());
         if (dto.getPrenom() != null)
@@ -220,6 +242,49 @@ public class PatientService {
                 .dateNaissance(patient.getDateNaissance())
                 .email(email)
                 .photoProfilUrl(patient.getPhotoProfilUrl())
+                .build();
+    }
+
+    /**
+     * Fusionne un patient orphelin avec le patient courant après vérification SMS.
+     * Transfère les RDV de l'orphelin vers le patient courant, met à jour le téléphone,
+     * puis supprime le patient orphelin.
+     */
+    @Transactional
+    public PatientProfileDTO mergePatientOnPhoneUpdate(Long userId, Long orphanPatientId) {
+        Patient currentPatient = patientRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Patient non trouvé"));
+        Patient orphanPatient = patientRepository.findById(orphanPatientId)
+                .orElseThrow(() -> new RuntimeException("Dossier patient introuvable"));
+
+        // Transférer tous les RDV de l'orphan vers le patient courant
+        List<Appointment> orphanAppointments = appointmentRepository.findByPatientId(orphanPatientId);
+        for (Appointment app : orphanAppointments) {
+            app.setPatient(currentPatient);
+        }
+        if (!orphanAppointments.isEmpty()) {
+            appointmentRepository.saveAll(orphanAppointments);
+            logger.info("Transferred {} appointments from orphan patient {} to patient {}",
+                    orphanAppointments.size(), orphanPatientId, currentPatient.getId());
+        }
+
+        // Mettre à jour le téléphone du patient courant
+        currentPatient.setTelephone(orphanPatient.getTelephone());
+        patientRepository.save(currentPatient);
+
+        // Supprimer le patient orphelin
+        patientRepository.delete(orphanPatient);
+        logger.info("Deleted orphan patient {} after merge with patient {} (user {})",
+                orphanPatientId, currentPatient.getId(), userId);
+
+        String email = currentPatient.getUser() != null ? currentPatient.getUser().getEmail() : null;
+        return PatientProfileDTO.builder()
+                .nom(currentPatient.getNom())
+                .prenom(currentPatient.getPrenom())
+                .telephone(currentPatient.getTelephone())
+                .dateNaissance(currentPatient.getDateNaissance())
+                .email(email)
+                .photoProfilUrl(currentPatient.getPhotoProfilUrl())
                 .build();
     }
 

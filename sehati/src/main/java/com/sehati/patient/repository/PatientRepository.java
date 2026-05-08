@@ -25,4 +25,12 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
            "OR LOWER(CONCAT(a.patient.prenom, ' ', a.patient.nom)) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR a.patient.telephone LIKE CONCAT('%', :search, '%'))")
     java.util.List<Patient> findDistinctPatientsByLaboratoireId(@org.springframework.data.repository.query.Param("laboId") Long laboId, @org.springframework.data.repository.query.Param("search") String search);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(DISTINCT a.patient.id) FROM Appointment a " +
+           "WHERE a.medecin.id = :medecinId AND a.status = 'COMPLETED' AND a.deletedByMedecin = false")
+    long countDistinctPatientsByMedecinId(@org.springframework.data.repository.query.Param("medecinId") Long medecinId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(DISTINCT a.patient.id) FROM Appointment a " +
+           "WHERE a.laboratoire.id = :laboId AND a.status = 'COMPLETED'")
+    long countDistinctPatientsByLaboratoireId(@org.springframework.data.repository.query.Param("laboId") Long laboId);
 }

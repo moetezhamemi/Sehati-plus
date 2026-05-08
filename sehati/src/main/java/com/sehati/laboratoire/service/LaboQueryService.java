@@ -19,8 +19,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class LaboQueryService {
 
@@ -63,7 +65,7 @@ public class LaboQueryService {
                 .longitude(labo.getLongitude())
                 .phones(labo.getPhones() != null ? labo.getPhones().stream().map(PhoneNumber::getNumber).collect(java.util.stream.Collectors.toList()) : new java.util.ArrayList<>())
                 .email(labo.getUser() != null ? labo.getUser().getEmail() : null)
-                .analyses(labo.getAnalyses())
+                .analyses(labo.getAnalyses() != null ? new java.util.ArrayList<>(labo.getAnalyses()) : new java.util.ArrayList<>())
                 .photoProfilUrl(labo.getPhotoProfilUrl())
                 .responsable(labo.getResponsable())
                 .workHours(mapWorkHoursToDTO(labo.getWorkHours()))

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 @Data
@@ -27,5 +28,5 @@ public class ConsultationAppointmentDTO {
     private LocalTime time;
     
     private String status;
-    private String analysesNames;
+    private List<String> analysesNames;
 }

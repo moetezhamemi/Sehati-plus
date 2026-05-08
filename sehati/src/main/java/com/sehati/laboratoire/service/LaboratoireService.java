@@ -121,7 +121,7 @@ public class LaboratoireService {
                 .phones(labo.getPhones() != null
                         ? labo.getPhones().stream().map(PhoneNumber::getNumber).collect(Collectors.toList())
                         : Collections.emptyList())
-                .analyses(labo.getAnalyses() != null ? labo.getAnalyses() : Collections.emptyList())
+                .analyses(labo.getAnalyses() != null ? new java.util.ArrayList<>(labo.getAnalyses()) : Collections.emptyList())
                 .build();
     }
 

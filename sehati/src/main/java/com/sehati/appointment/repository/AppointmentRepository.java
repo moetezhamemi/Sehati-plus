@@ -4,6 +4,8 @@ import com.sehati.appointment.entities.Appointment;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -15,6 +17,30 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     // --- Patient ---
     List<Appointment> findByPatientIdAndDateAfterOrderByDateAscTimeAsc(Long patientId, LocalDate date);
     Page<Appointment> findByPatientIdAndStatusAndDateBeforeOrderByDateDescTimeDesc(Long patientId, String status, LocalDate date, Pageable pageable);
+    Page<Appointment> findByPatientIdAndMedecinIsNotNullAndStatusAndDateBeforeOrderByDateDescTimeDesc(Long patientId, String status, LocalDate date, Pageable pageable);
+    Page<Appointment> findByPatientIdAndLaboratoireIsNotNullAndStatusAndDateBeforeOrderByDateDescTimeDesc(Long patientId, String status, LocalDate date, Pageable pageable);
+
+    // --- Patient : recherche historique (filtre type + recherche textuelle) ---
+    @Query("SELECT a FROM Appointment a " +
+           "LEFT JOIN a.medecin m " +
+           "LEFT JOIN a.laboratoire l " +
+           "WHERE a.patient.id = :patientId " +
+           "AND a.status = :status " +
+           "AND a.date < :dateBefore " +
+           "AND (:type IS NULL OR " +
+           "     (:type = 'Médecin' AND a.medecin IS NOT NULL) OR " +
+           "     (:type = 'Laboratoire' AND a.laboratoire IS NOT NULL)) " +
+           "AND (:search IS NULL OR :search = '' OR " +
+           "     LOWER(CONCAT(COALESCE(m.prenom,''), ' ', COALESCE(m.nom,''))) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(COALESCE(l.nomLabo,'')) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY a.date DESC, a.time DESC")
+    Page<Appointment> searchPatientHistory(
+            @Param("patientId") Long patientId,
+            @Param("status") String status,
+            @Param("dateBefore") LocalDate dateBefore,
+            @Param("type") String type,
+            @Param("search") String search,
+            Pageable pageable);
 
     // --- Médecin : vue liste (par date) ---
     List<Appointment> findByMedecinIdAndDateOrderByTimeAsc(Long medecinId, LocalDate date);
@@ -35,4 +61,58 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     // --- Dossier Patient ---
     List<Appointment> findByPatientIdAndMedecinIdAndStatusAndDeletedByMedecinFalseOrderByDateDescTimeDesc(Long patientId, Long medecinId, String status);
     List<Appointment> findByPatientIdAndMedecinId(Long patientId, Long medecinId);
+
+    // --- Review eligibility ---
+    boolean existsByPatientIdAndMedecinIdAndStatus(Long patientId, Long medecinId, String status);
+    boolean existsByPatientIdAndLaboratoireIdAndStatus(Long patientId, Long laboratoireId, String status);
+
+    // --- Dashboard Médecin ---
+    long countByMedecinIdAndDateBetween(Long medecinId, LocalDate start, LocalDate end);
+    long countByMedecinIdAndStatusAndDateBetween(Long medecinId, String status, LocalDate start, LocalDate end);
+
+    @org.springframework.data.jpa.repository.Query("SELECT a.date, COUNT(a) FROM Appointment a " +
+           "WHERE a.medecin.id = :medecinId AND a.date BETWEEN :start AND :end " +
+           "GROUP BY a.date ORDER BY a.date")
+    List<Object[]> countByMedecinIdGroupByDate(@org.springframework.data.repository.query.Param("medecinId") Long medecinId,
+                                               @org.springframework.data.repository.query.Param("start") LocalDate start,
+                                               @org.springframework.data.repository.query.Param("end") LocalDate end);
+
+    // --- Dashboard Laboratoire ---
+    long countByLaboratoireIdAndDateBetween(Long laboId, LocalDate start, LocalDate end);
+    long countByLaboratoireIdAndStatusAndDateBetween(Long laboId, String status, LocalDate start, LocalDate end);
+
+    @org.springframework.data.jpa.repository.Query("SELECT a.date, COUNT(a) FROM Appointment a " +
+           "WHERE a.laboratoire.id = :laboId AND a.date BETWEEN :start AND :end " +
+           "GROUP BY a.date ORDER BY a.date")
+    List<Object[]> countByLaboratoireIdGroupByDate(@org.springframework.data.repository.query.Param("laboId") Long laboId,
+                                                   @org.springframework.data.repository.query.Param("start") LocalDate start,
+                                                   @org.springframework.data.repository.query.Param("end") LocalDate end);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT a.date FROM Appointment a " +
+           "WHERE a.medecin.id = :medecinId AND a.status = 'CONFIRMED' AND a.date < CURRENT_DATE")
+    List<LocalDate> findDatesWithPendingPastAppointmentsForMedecin(@org.springframework.data.repository.query.Param("medecinId") Long medecinId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT a.date FROM Appointment a " +
+           "WHERE a.laboratoire.id = :laboId AND a.status = 'CONFIRMED' AND a.date < CURRENT_DATE")
+    List<LocalDate> findDatesWithPendingPastAppointmentsForLabo(@org.springframework.data.repository.query.Param("laboId") Long laboId);
+
+    // --- Patient merge ---
+    List<Appointment> findByPatientId(Long patientId);
+
+    // --- Notification reminders ---
+    @Query("SELECT a FROM Appointment a WHERE a.status = 'CONFIRMED' " +
+           "AND a.reminder24hSent = false " +
+           "AND a.date = :date AND a.time BETWEEN :startTime AND :endTime")
+    List<Appointment> findReminder24hCandidates(
+            @Param("date") LocalDate date,
+            @Param("startTime") java.time.LocalTime startTime,
+            @Param("endTime") java.time.LocalTime endTime);
+
+    @Query("SELECT a FROM Appointment a WHERE a.status = 'CONFIRMED' " +
+           "AND a.reminder2hSent = false " +
+           "AND a.date = :date AND a.time BETWEEN :startTime AND :endTime")
+    List<Appointment> findReminder2hCandidates(
+            @Param("date") LocalDate date,
+            @Param("startTime") java.time.LocalTime startTime,
+            @Param("endTime") java.time.LocalTime endTime);
 }

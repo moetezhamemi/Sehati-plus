@@ -23,4 +23,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("SELECT new com.sehati.review.dto.RatingSummaryDTO(CAST(AVG(r.rating) AS Double), COUNT(r.id)) " +
            "FROM Review r WHERE r.targetId = :targetId AND r.targetType = :targetType")
     RatingSummaryDTO getRatingSummary(Long targetId, TargetType targetType);
+
+    @Query("SELECT r FROM Review r JOIN FETCH r.reviewer " +
+           "WHERE r.targetId = :targetId AND r.targetType = :targetType " +
+           "ORDER BY r.createdAt DESC")
+    java.util.List<Review> findRecentByTarget(@org.springframework.data.repository.query.Param("targetId") Long targetId,
+                                              @org.springframework.data.repository.query.Param("targetType") TargetType targetType);
 }

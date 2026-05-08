@@ -43,7 +43,7 @@ public class OrdonnancePdfService {
         // 1. Préparer le contexte Thymeleaf
         Context context = new Context();
         context.setVariable("nomMedecin", medecin.getNom() + " " + medecin.getPrenom());
-        context.setVariable("specialiteMedecin", medecin.getSpecialite() != null ? medecin.getSpecialite() : "Médecin");
+        context.setVariable("specialiteMedecin", medecin.getSpecialite() != null ? medecin.getSpecialite().getNom() : "Médecin");
         context.setVariable("villeMedecin", medecin.getVille() != null ? medecin.getVille() : "");
         context.setVariable("dateAujourdhui", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
         context.setVariable("nomPatient", patient.getNom() + " " + patient.getPrenom());
@@ -90,7 +90,7 @@ public class OrdonnancePdfService {
         // 1. Préparer le contexte Thymeleaf
         Context context = new Context();
         context.setVariable("nomMedecin", medecin.getNom() + " " + medecin.getPrenom());
-        context.setVariable("specialiteMedecin", medecin.getSpecialite() != null ? medecin.getSpecialite() : "Médecin");
+        context.setVariable("specialiteMedecin", medecin.getSpecialite() != null ? medecin.getSpecialite().getNom() : "Médecin");
         context.setVariable("villeMedecin", medecin.getVille() != null ? medecin.getVille() : "");
         context.setVariable("dateAujourdhui", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
         context.setVariable("nomPatient", patient.getNom() + " " + patient.getPrenom());

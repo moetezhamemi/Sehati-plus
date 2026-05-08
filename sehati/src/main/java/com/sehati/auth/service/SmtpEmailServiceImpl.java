@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.sehati.common.exception.BusinessException;
@@ -19,6 +20,7 @@ public class SmtpEmailServiceImpl implements EmailService {
     private JavaMailSender emailSender;
 
     @Override
+    @Async
     public void sendVerificationEmail(String toEmail, String otpCode) {
         try {
             MimeMessage mimeMessage = emailSender.createMimeMessage();
@@ -66,6 +68,7 @@ public class SmtpEmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendPasswordResetEmail(String toEmail, String otpCode) {
         try {
             MimeMessage mimeMessage = emailSender.createMimeMessage();
@@ -114,12 +117,16 @@ public class SmtpEmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendSecretaireInvitationEmail(String toEmail, String medecinName, String token) {
+    @Async
+    public void sendSecretaireInvitationEmail(String toEmail, String medecinName, String token, boolean hasPassword) {
         try {
             MimeMessage mimeMessage = emailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
 
             String setupUrl = "http://localhost:4200/secretaire-setup?token=" + token;
+            String buttonText = hasPassword ? "Accepter l'invitation" : "Configurer mon compte";
+            String actionText = hasPassword ? "Pour accepter cette invitation et accéder à son espace, veuillez cliquer sur le bouton ci-dessous :" 
+                                            : "Pour activer votre compte et créer votre mot de passe, veuillez cliquer sur le bouton ci-dessous :";
 
             String htmlMsg = "<!DOCTYPE html>"
                     + "<html><head><meta charset=\"utf-8\"><style>"
@@ -141,9 +148,9 @@ public class SmtpEmailServiceImpl implements EmailService {
                     + "<h2>Invitation de " + medecinName + "</h2>"
                     + "<p>Bonjour,</p>"
                     + "<p>Le <strong>Dr. " + medecinName + "</strong> vous a invité(e) à rejoindre son cabinet sur la plateforme Sehhati+ en tant que secrétaire.</p>"
-                    + "<p>Pour activer votre compte et créer votre mot de passe, veuillez cliquer sur le bouton ci-dessous :</p>"
+                    + "<p>" + actionText + "</p>"
                     + "<div class=\"btn-box\">"
-                    + "<a href=\"" + setupUrl + "\" class=\"btn\">Configurer mon compte</a>"
+                    + "<a href=\"" + setupUrl + "\" class=\"btn\">" + buttonText + "</a>"
                     + "</div>"
                     + "<p>Ce lien est exclusif et confidentiel.</p>"
                     + "</div>"
@@ -161,6 +168,184 @@ public class SmtpEmailServiceImpl implements EmailService {
             emailSender.send(mimeMessage);
         } catch (MessagingException e) {
             throw new BusinessException("Erreur lors de l'envoi de l'e-mail d'invitation: " + e.getMessage());
+        }
+    }
+    @Override
+    @Async
+    public void sendAccountActivatedEmail(String toEmail) {
+        try {
+            MimeMessage mimeMessage = emailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+
+            String htmlMsg = "<!DOCTYPE html>"
+                    + "<html><head><meta charset=\"utf-8\"><style>"
+                    + "body { font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }"
+                    + ".container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid #eef0f2; }"
+                    + ".header { background-color: #10b981; padding: 35px 30px; text-align: center; color: white; }"
+                    + ".header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }"
+                    + ".content { padding: 40px 30px; color: #4b5563; line-height: 1.6; text-align: left; }"
+                    + ".content h2 { margin-top: 0; color: #111827; font-size: 22px; font-weight: 600; }"
+                    + ".footer { background-color: #f9fafb; padding: 25px; text-align: center; font-size: 13px; color: #9ca3af; border-top: 1px solid #f3f4f6; }"
+                    + "</style></head><body>"
+                    + "<div class=\"container\">"
+                    + "<div class=\"header\">"
+                    + "<h1>Sehhati+</h1>"
+                    + "</div>"
+                    + "<div class=\"content\">"
+                    + "<h2>Votre compte a été activé</h2>"
+                    + "<p>Bonjour,</p>"
+                    + "<p>Nous avons le plaisir de vous informer que votre compte sur Sehhati+ a été activé par l'administrateur.</p>"
+                    + "<p>Vous pouvez dès à présent vous connecter et accéder à tous nos services normalement.</p>"
+                    + "<p>Merci de votre confiance.</p>"
+                    + "</div>"
+                    + "<div class=\"footer\">"
+                    + "<p>© 2026 Sehhati+. Tous droits réservés.</p>"
+                    + "</div>"
+                    + "</div>"
+                    + "</body></html>";
+
+            helper.setFrom("sehati.nepasrepondre@gmail.com");
+            helper.setTo(toEmail);
+            helper.setSubject("Sehhati+ : Votre compte a été réactivé");
+            helper.setText(htmlMsg, true);
+
+            emailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            throw new BusinessException("Erreur lors de l'envoi de l'e-mail d'activation: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Async
+    public void sendAccountDeactivatedEmail(String toEmail) {
+        try {
+            MimeMessage mimeMessage = emailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+
+            String htmlMsg = "<!DOCTYPE html>"
+                    + "<html><head><meta charset=\"utf-8\"><style>"
+                    + "body { font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }"
+                    + ".container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid #eef0f2; }"
+                    + ".header { background-color: #ef4444; padding: 35px 30px; text-align: center; color: white; }"
+                    + ".header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }"
+                    + ".content { padding: 40px 30px; color: #4b5563; line-height: 1.6; text-align: left; }"
+                    + ".content h2 { margin-top: 0; color: #111827; font-size: 22px; font-weight: 600; }"
+                    + ".footer { background-color: #f9fafb; padding: 25px; text-align: center; font-size: 13px; color: #9ca3af; border-top: 1px solid #f3f4f6; }"
+                    + "</style></head><body>"
+                    + "<div class=\"container\">"
+                    + "<div class=\"header\">"
+                    + "<h1>Sehhati+</h1>"
+                    + "</div>"
+                    + "<div class=\"content\">"
+                    + "<h2>Votre compte a été désactivé</h2>"
+                    + "<p>Bonjour,</p>"
+                    + "<p>Nous vous informons que votre compte sur Sehhati+ a été désactivé par l'administrateur.</p>"
+                    + "<p>Par conséquent, vous ne pouvez plus vous connecter à la plateforme pour le moment.</p>"
+                    + "<p>Si vous pensez qu'il s'agit d'une erreur ou si vous souhaitez obtenir plus d'informations, veuillez contacter notre support.</p>"
+                    + "</div>"
+                    + "<div class=\"footer\">"
+                    + "<p>© 2026 Sehhati+. Tous droits réservés.</p>"
+                    + "</div>"
+                    + "</div>"
+                    + "</body></html>";
+
+            helper.setFrom("sehati.nepasrepondre@gmail.com");
+            helper.setTo(toEmail);
+            helper.setSubject("Sehhati+ : Information concernant votre compte");
+            helper.setText(htmlMsg, true);
+
+            emailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            throw new BusinessException("Erreur lors de l'envoi de l'e-mail de désactivation: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Async
+    public void sendRequestApprovedEmail(String toEmail) {
+        try {
+            MimeMessage mimeMessage = emailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+
+            String htmlMsg = "<!DOCTYPE html>"
+                    + "<html><head><meta charset=\"utf-8\"><style>"
+                    + "body { font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }"
+                    + ".container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid #eef0f2; }"
+                    + ".header { background-color: #10b981; padding: 35px 30px; text-align: center; color: white; }"
+                    + ".header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }"
+                    + ".content { padding: 40px 30px; color: #4b5563; line-height: 1.6; text-align: left; }"
+                    + ".content h2 { margin-top: 0; color: #111827; font-size: 22px; font-weight: 600; }"
+                    + ".footer { background-color: #f9fafb; padding: 25px; text-align: center; font-size: 13px; color: #9ca3af; border-top: 1px solid #f3f4f6; }"
+                    + "</style></head><body>"
+                    + "<div class=\"container\">"
+                    + "<div class=\"header\">"
+                    + "<h1>Sehhati+</h1>"
+                    + "</div>"
+                    + "<div class=\"content\">"
+                    + "<h2>Votre demande d'inscription a été approuvée</h2>"
+                    + "<p>Bonjour,</p>"
+                    + "<p>Nous avons le plaisir de vous informer que votre demande d'inscription sur Sehhati+ a été <strong>approuvée</strong> par notre équipe d'administration.</p>"
+                    + "<p>Votre compte est désormais actif. Vous pouvez dès à présent vous connecter et accéder à tous les services de la plateforme.</p>"
+                    + "<p>Merci de votre confiance et bienvenue sur Sehhati+ !</p>"
+                    + "</div>"
+                    + "<div class=\"footer\">"
+                    + "<p>© 2026 Sehhati+. Tous droits réservés.</p>"
+                    + "</div>"
+                    + "</div>"
+                    + "</body></html>";
+
+            helper.setFrom("sehati.nepasrepondre@gmail.com");
+            helper.setTo(toEmail);
+            helper.setSubject("Sehhati+ : Votre demande d'inscription a été approuvée");
+            helper.setText(htmlMsg, true);
+
+            emailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            throw new BusinessException("Erreur lors de l'envoi de l'e-mail d'approbation: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Async
+    public void sendRequestRejectedEmail(String toEmail) {
+        try {
+            MimeMessage mimeMessage = emailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+
+            String htmlMsg = "<!DOCTYPE html>"
+                    + "<html><head><meta charset=\"utf-8\"><style>"
+                    + "body { font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }"
+                    + ".container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid #eef0f2; }"
+                    + ".header { background-color: #ef4444; padding: 35px 30px; text-align: center; color: white; }"
+                    + ".header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }"
+                    + ".content { padding: 40px 30px; color: #4b5563; line-height: 1.6; text-align: left; }"
+                    + ".content h2 { margin-top: 0; color: #111827; font-size: 22px; font-weight: 600; }"
+                    + ".footer { background-color: #f9fafb; padding: 25px; text-align: center; font-size: 13px; color: #9ca3af; border-top: 1px solid #f3f4f6; }"
+                    + "</style></head><body>"
+                    + "<div class=\"container\">"
+                    + "<div class=\"header\">"
+                    + "<h1>Sehhati+</h1>"
+                    + "</div>"
+                    + "<div class=\"content\">"
+                    + "<h2>Votre demande d'inscription a été refusée</h2>"
+                    + "<p>Bonjour,</p>"
+                    + "<p>Nous regrettons de vous informer que votre demande d'inscription sur Sehhati+ a été <strong>refusée</strong> par notre équipe d'administration.</p>"
+                    + "<p>Si vous pensez qu'il s'agit d'une erreur ou si vous souhaitez obtenir plus d'informations, veuillez contacter notre support.</p>"
+                    + "</div>"
+                    + "<div class=\"footer\">"
+                    + "<p>© 2026 Sehhati+. Tous droits réservés.</p>"
+                    + "</div>"
+                    + "</div>"
+                    + "</body></html>";
+
+            helper.setFrom("sehati.nepasrepondre@gmail.com");
+            helper.setTo(toEmail);
+            helper.setSubject("Sehhati+ : Votre demande d'inscription a été refusée");
+            helper.setText(htmlMsg, true);
+
+            emailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            throw new BusinessException("Erreur lors de l'envoi de l'e-mail de rejet: " + e.getMessage());
         }
     }
 }

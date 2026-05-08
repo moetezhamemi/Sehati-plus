@@ -2,8 +2,10 @@ package com.sehati.laboratoire.controller;
 
 import com.sehati.auth.security.UserDetailsImpl;
 import com.sehati.common.service.CloudinaryService;
+import com.sehati.laboratoire.dto.LaboDashboardStatsDTO;
 import com.sehati.laboratoire.dto.LaboProfileDTO;
 import com.sehati.laboratoire.dto.LaboHoraireDTO;
+import com.sehati.laboratoire.service.LaboDashboardService;
 import com.sehati.laboratoire.service.LaboratoireService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +22,16 @@ import java.util.Map;
 public class LaboProfileController {
 
     private final LaboratoireService laboratoireService;
+    private final LaboDashboardService laboDashboardService;
     private final CloudinaryService cloudinaryService;
+
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasAuthority('LABORATOIRE')")
+    public ResponseEntity<LaboDashboardStatsDTO> getDashboardStats(
+            @RequestParam(defaultValue = "YEAR") String period,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(laboDashboardService.getDashboardStats(userDetails.getId(), period));
+    }
 
     @GetMapping("/profile/me")
     @PreAuthorize("hasAuthority('LABORATOIRE')")

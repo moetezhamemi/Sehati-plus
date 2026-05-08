@@ -116,6 +116,20 @@ public class AppointmentController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/pending-past-dates")
+    @PreAuthorize("hasAnyAuthority('MEDECIN', 'LABORATOIRE', 'SECRETAIRE')")
+    public ResponseEntity<List<String>> getPendingPastDates(
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        String role = "MEDECIN";
+        if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("LABORATOIRE"))) {
+            role = "LABORATOIRE";
+        } else if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SECRETAIRE"))) {
+            role = "SECRETAIRE";
+        }
+        return ResponseEntity.ok(appointmentService.getPendingPastDates(userDetails.getId(), role));
+    }
+
+
     @GetMapping("/my-upcoming")
     @PreAuthorize("hasAuthority('PATIENT')")
     public ResponseEntity<List<PatientAppointmentDTO>> getMyUpcomingAppointments(
@@ -127,9 +141,11 @@ public class AppointmentController {
     @PreAuthorize("hasAuthority('PATIENT')")
     public ResponseEntity<Page<PatientAppointmentDTO>> getMyPastAppointments(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(appointmentService.getMyPastAppointments(userDetails.getId(), PageRequest.of(page, size)));
+        return ResponseEntity.ok(appointmentService.getMyPastAppointments(userDetails.getId(), type, search, PageRequest.of(page, size)));
     }
 
     @PutMapping("/{id}/cancel")

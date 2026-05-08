@@ -1,13 +1,16 @@
 package com.sehati.auth.service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.sehati.common.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -20,6 +23,7 @@ import com.sehati.auth.dto.ForgotPasswordRequest;
 import com.sehati.auth.dto.GoogleAuthRequest;
 import com.sehati.auth.dto.JwtResponse;
 import com.sehati.auth.dto.LoginRequest;
+import com.sehati.auth.dto.PatientRegistrationResponse;
 import com.sehati.auth.dto.ResetPasswordOtpRequest;
 import com.sehati.auth.dto.SignupLaboRequest;
 import com.sehati.auth.dto.SignupMedecinRequest;
@@ -30,8 +34,11 @@ import com.sehati.auth.repositories.RoleRepository;
 import com.sehati.auth.repositories.UserRepository;
 import com.sehati.auth.security.JwtUtils;
 import com.sehati.auth.security.UserDetailsImpl;
+import com.sehati.common.service.TwilioSmsService;
 import com.sehati.laboratoire.service.LaboratoireService;
 import com.sehati.medecin.service.MedecinService;
+import com.sehati.patient.entities.Patient;
+import com.sehati.patient.repository.PatientRepository;
 import com.sehati.patient.service.PatientService;
 
 import jakarta.transaction.Transactional;
@@ -45,35 +52,44 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PatientService patientService;
+    private final PatientRepository patientRepository;
     private final MedecinService medecinService;
     private final LaboratoireService laboratoireService;
     private final PasswordEncoder encoder;
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
     private final OtpService otpService;
+    private final TwilioSmsService twilioSmsService;
+    private final StringRedisTemplate redisTemplate;
     private final com.sehati.secretaire.repository.MedecinSecretaireRepository medecinSecretaireRepository;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
-                           UserRepository userRepository,
-                           RoleRepository roleRepository,
-                           PatientService patientService,
-                           MedecinService medecinService,
-                           LaboratoireService laboratoireService,
-                           PasswordEncoder encoder,
-                           JwtUtils jwtUtils,
-                           EmailService emailService,
-                           OtpService otpService,
-                           com.sehati.secretaire.repository.MedecinSecretaireRepository medecinSecretaireRepository) {
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            PatientService patientService,
+            PatientRepository patientRepository,
+            MedecinService medecinService,
+            LaboratoireService laboratoireService,
+            PasswordEncoder encoder,
+            JwtUtils jwtUtils,
+            EmailService emailService,
+            OtpService otpService,
+            TwilioSmsService twilioSmsService,
+            StringRedisTemplate redisTemplate,
+            com.sehati.secretaire.repository.MedecinSecretaireRepository medecinSecretaireRepository) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.patientService = patientService;
+        this.patientRepository = patientRepository;
         this.medecinService = medecinService;
         this.laboratoireService = laboratoireService;
         this.encoder = encoder;
         this.jwtUtils = jwtUtils;
         this.emailService = emailService;
         this.otpService = otpService;
+        this.twilioSmsService = twilioSmsService;
+        this.redisTemplate = redisTemplate;
         this.medecinSecretaireRepository = medecinSecretaireRepository;
     }
 
@@ -148,23 +164,58 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public String registerPatient(SignupPatientRequest signUpRequest) {
-        checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(), signUpRequest.getConfirmPassword());
+    public PatientRegistrationResponse registerPatient(SignupPatientRequest signUpRequest) {
+        checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(),
+                signUpRequest.getConfirmPassword());
+
+        // Vérifier si un patient existe déjà avec ce numéro de téléphone
+        Optional<Patient> existingPatient = patientRepository.findFirstByTelephone(signUpRequest.getTelephone());
+        boolean requiresPhoneVerification = false;
+
+        if (existingPatient.isPresent() && existingPatient.get().getUser() != null) {
+            // Cas 3 : Patient avec un compte User existant → bloquer
+            throw new BusinessException("Ce numéro de téléphone est déjà associé à un compte existant.");
+        }
 
         User user = createUser(signUpRequest.getEmail(), signUpRequest.getPassword(), "PATIENT", true, "APPROVED");
         User savedUser = saveUserAndSendOtp(user);
 
-        patientService.createPatientOrchestrator(savedUser, signUpRequest);
+        if (existingPatient.isPresent()) {
+            // Cas 2 : Patient existant sans User → fusion après vérification SMS
+            requiresPhoneVerification = true;
 
-        logger.info("Registered new PATIENT user: {}", savedUser.getEmail());
+            // Stocker dans Redis la paire email→patientId pour la fusion post-vérification
+            redisTemplate.opsForValue().set(
+                    "phone_merge:" + savedUser.getEmail(),
+                    existingPatient.get().getId().toString(),
+                    Duration.ofHours(1));
 
-        return "Un email de vérification vous a été envoyé, veuillez confirmer votre email.";
+            // Stocker aussi les infos du signup pour mettre à jour le patient après fusion
+            redisTemplate.opsForValue().set(
+                    "phone_merge_data:" + savedUser.getEmail(),
+                    signUpRequest.getNom() + "|" + signUpRequest.getPrenom() + "|" + signUpRequest.getDateNaissance(),
+                    Duration.ofHours(1));
+
+            logger.info("Registered new PATIENT user: {} — requires phone verification (existing patient ID: {})",
+                    savedUser.getEmail(), existingPatient.get().getId());
+        } else {
+            // Cas 1 : Pas de patient existant → inscription normale
+            patientService.createPatientOrchestrator(savedUser, signUpRequest);
+            logger.info("Registered new PATIENT user: {}", savedUser.getEmail());
+        }
+
+        return PatientRegistrationResponse.builder()
+                .message("Un email de vérification vous a été envoyé, veuillez confirmer votre email.")
+                .requiresPhoneVerification(requiresPhoneVerification)
+                .email(signUpRequest.getEmail())
+                .build();
     }
 
     @Override
     @Transactional
     public String registerMedecin(SignupMedecinRequest signUpRequest) {
-        checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(), signUpRequest.getConfirmPassword());
+        checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(),
+                signUpRequest.getConfirmPassword());
 
         User user = createUser(signUpRequest.getEmail(), signUpRequest.getPassword(), "MEDECIN", false, "PENDING");
         User savedUser = saveUserAndSendOtp(user);
@@ -179,7 +230,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public String registerLaboratoire(SignupLaboRequest signUpRequest) {
-        checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(), signUpRequest.getConfirmPassword());
+        checkEmailAndPasswords(signUpRequest.getEmail(), signUpRequest.getPassword(),
+                signUpRequest.getConfirmPassword());
 
         User user = createUser(signUpRequest.getEmail(), signUpRequest.getPassword(), "LABORATOIRE", false, "PENDING");
         User savedUser = saveUserAndSendOtp(user);
@@ -242,11 +294,17 @@ public class AuthServiceImpl implements AuthService {
         response.put("role", role);
         response.put("status", status);
 
-        // If the user is already approved (e.g., Patients), generate a token for automatic login
-        if ("APPROVED".equals(status)) {
+        // Vérifier si une fusion SMS est requise
+        String mergeKey = "phone_merge:" + email;
+        boolean requiresPhoneVerification = Boolean.TRUE.equals(redisTemplate.hasKey(mergeKey));
+        response.put("requiresPhoneVerification", requiresPhoneVerification);
+
+        // If the user is already approved (e.g., Patients) AND no phone verification needed,
+        // generate a token for automatic login
+        if ("APPROVED".equals(status) && !requiresPhoneVerification) {
             UserDetailsImpl userDetails = UserDetailsImpl.build(user);
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails,
+                    null, userDetails.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             String jwt = jwtUtils.generateJwtToken(authentication);
@@ -261,6 +319,111 @@ public class AuthServiceImpl implements AuthService {
 
             logger.info("Auto-login generated for user: {}, roles: {}", email, roles);
         }
+
+        return response;
+    }
+
+    // =========================================================
+    // SMS OTP — Liaison dossier médical existant
+    // =========================================================
+
+    @Override
+    @Transactional
+    public String sendSmsOtp(String telephone, String email) {
+        // Vérifier que le contexte de fusion existe dans Redis
+        String mergeKey = "phone_merge:" + email;
+        if (!Boolean.TRUE.equals(redisTemplate.hasKey(mergeKey))) {
+            throw new BusinessException("Aucune demande de vérification en cours pour cet email.");
+        }
+
+        try {
+            twilioSmsService.sendVerificationCode(telephone);
+            logger.info("SMS verification sent for phone merge: email={}, phone={}", email, telephone);
+            return "Un code de vérification a été envoyé par SMS.";
+        } catch (Exception e) {
+            logger.error("Failed to send SMS to {}", telephone, e);
+            throw new BusinessException("Erreur lors de l'envoi du SMS. Veuillez réessayer.");
+        }
+    }
+
+    @Override
+    @Transactional
+    public java.util.Map<String, Object> verifySmsOtp(String telephone, String code, String email) {
+        // Vérifier le code via Twilio
+        boolean approved;
+        try {
+            approved = twilioSmsService.verifyCode(telephone, code);
+        } catch (Exception e) {
+            logger.error("Twilio verification failed for phone {}", telephone, e);
+            throw new BusinessException("Erreur lors de la vérification du code SMS.");
+        }
+
+        if (!approved) {
+            throw new BusinessException("Code SMS incorrect ou expiré.");
+        }
+
+        // Récupérer le patientId depuis Redis
+        String mergeKey = "phone_merge:" + email;
+        String patientIdStr = redisTemplate.opsForValue().get(mergeKey);
+        if (patientIdStr == null) {
+            throw new BusinessException("La session de vérification a expiré. Veuillez recommencer l'inscription.");
+        }
+
+        Long patientId = Long.parseLong(patientIdStr);
+
+        // Récupérer le user et le patient
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Aucun compte trouvé avec cet email."));
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new BusinessException("Dossier patient introuvable."));
+
+        // Lier le User au Patient existant
+        patient.setUser(user);
+
+        // Mettre à jour les infos du patient avec les données du signup
+        String mergeDataKey = "phone_merge_data:" + email;
+        String mergeData = redisTemplate.opsForValue().get(mergeDataKey);
+        if (mergeData != null) {
+            String[] parts = mergeData.split("\\|", 3);
+            if (parts.length >= 2) {
+                patient.setNom(parts[0]);
+                patient.setPrenom(parts[1]);
+            }
+            if (parts.length == 3 && !parts[2].equals("null")) {
+                try {
+                    patient.setDateNaissance(java.time.LocalDate.parse(parts[2]));
+                } catch (Exception ignored) {
+                    // keep existing dateNaissance if parse fails
+                }
+            }
+        }
+
+        patientRepository.save(patient);
+
+        // Nettoyer Redis
+        redisTemplate.delete(mergeKey);
+        redisTemplate.delete(mergeDataKey);
+
+        logger.info("Patient {} merged with user {} after SMS verification", patientId, user.getEmail());
+
+        // Auto-login
+        UserDetailsImpl userDetails = UserDetailsImpl.build(user);
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails,
+                null, userDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("token", jwt);
+        response.put("id", userDetails.getId());
+        response.put("email", userDetails.getEmail());
+        response.put("roles", roles);
+        response.put("message", "Votre dossier médical a été lié avec succès à votre compte.");
 
         return response;
     }
@@ -296,7 +459,8 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BusinessException("Aucun compte trouvé."));
 
-        OtpValidationResult result = otpService.validateAndInvalidate(request.getEmail(), "PASSWORD_RESET", request.getOtp());
+        OtpValidationResult result = otpService.validateAndInvalidate(request.getEmail(), "PASSWORD_RESET",
+                request.getOtp());
         if (result == OtpValidationResult.EXPIRED) {
             throw new BusinessException("Ce code est expiré. Veuillez demander une nouvelle réinitialisation.");
         } else if (result == OtpValidationResult.MAX_ATTEMPTS_REACHED) {
@@ -346,11 +510,10 @@ public class AuthServiceImpl implements AuthService {
             User savedUser = userRepository.save(newUser);
 
             patientService.createPatientFromGoogle(
-                savedUser,
-                (String) googlePayload.getOrDefault("given_name", ""),
-                (String) googlePayload.getOrDefault("family_name", "")
-            );
-            
+                    savedUser,
+                    (String) googlePayload.getOrDefault("given_name", ""),
+                    (String) googlePayload.getOrDefault("family_name", ""));
+
             logger.info("Created new patient from Google login: {}", email);
 
             return savedUser;
@@ -362,8 +525,8 @@ public class AuthServiceImpl implements AuthService {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
 
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null,
+                userDetails.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         String jwt = jwtUtils.generateJwtToken(authentication);
@@ -401,9 +564,18 @@ public class AuthServiceImpl implements AuthService {
         user.setVerificationToken(null);
         userRepository.save(user);
 
+        // Activer la relation MedecinSecretaire PENDING → ACTIVE
+        medecinSecretaireRepository.findBySecretaireUserIdAndStatus(user.getId(), "PENDING")
+                .ifPresent(relation -> {
+                    relation.setStatus("ACTIVE");
+                    medecinSecretaireRepository.save(relation);
+                    logger.info("Relation MedecinSecretaire activée via auto-login pour la secrétaire user ID: {}",
+                            user.getId());
+                });
+
         UserDetailsImpl userDetails = UserDetailsImpl.build(user);
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null,
+                userDetails.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         String jwt = jwtUtils.generateJwtToken(authentication);
@@ -448,8 +620,8 @@ public class AuthServiceImpl implements AuthService {
 
         // Auto login
         UserDetailsImpl userDetails = UserDetailsImpl.build(user);
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null,
+                userDetails.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         String jwt = jwtUtils.generateJwtToken(authentication);

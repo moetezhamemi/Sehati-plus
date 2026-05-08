@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
+import java.util.ArrayList;
 
 @Data
 @NoArgsConstructor
@@ -33,7 +35,8 @@ public class Appointment {
     @JoinColumn(name = "laboratoire_id")
     private Laboratoire laboratoire;
 
-    private String analysesNames;
+    @OneToMany(mappedBy = "appointment", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AnalyseAppoitement> analyses = new ArrayList<>();
 
     @Column(length = 1000)
     private String ordonnanceUrl;
@@ -53,4 +56,10 @@ public class Appointment {
 
     @Column(columnDefinition = "boolean default false")
     private boolean deletedByMedecin = false;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean reminder24hSent = false;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean reminder2hSent = false;
 }

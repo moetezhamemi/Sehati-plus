@@ -110,4 +110,21 @@ public class CloudinaryService {
             throw new RuntimeException("Erreur lors de l'upload du cachet", e);
         }
     }
+
+    /**
+     * Upload an audio file to Cloudinary.
+     */
+    @SuppressWarnings("unchecked")
+    public String uploadAudio(MultipartFile file) {
+        try {
+            Map<String, Object> params = ObjectUtils.asMap(
+                    "resource_type", "video", // Cloudinary uses video for audio files
+                    "folder", "sehati-audio"
+            );
+            Map<String, Object> result = cloudinary.uploader().upload(file.getBytes(), params);
+            return result.get("secure_url").toString();
+        } catch (IOException e) {
+            throw new RuntimeException("Erreur lors de l'upload de l'audio", e);
+        }
+    }
 }

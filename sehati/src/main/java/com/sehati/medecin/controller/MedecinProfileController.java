@@ -2,8 +2,10 @@ package com.sehati.medecin.controller;
 
 import com.sehati.auth.security.UserDetailsImpl;
 import com.sehati.common.service.CloudinaryService;
+import com.sehati.medecin.dto.DashboardStatsDTO;
 import com.sehati.medecin.dto.HoraireDTO;
 import com.sehati.medecin.dto.MedecinProfileDTO;
+import com.sehati.medecin.service.MedecinDashboardService;
 import com.sehati.medecin.service.MedecinService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +22,16 @@ import java.util.Map;
 public class MedecinProfileController {
 
     private final MedecinService medecinService;
+    private final MedecinDashboardService dashboardService;
     private final CloudinaryService cloudinaryService;
+
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasAuthority('MEDECIN')")
+    public ResponseEntity<DashboardStatsDTO> getDashboardStats(
+            @RequestParam(defaultValue = "WEEK") String period,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(dashboardService.getDashboardStats(userDetails.getId(), period));
+    }
 
     @GetMapping("/profile/me")
     @PreAuthorize("hasAuthority('MEDECIN')")

@@ -11,9 +11,9 @@ import com.sehati.appointment.dto.PatientAppointmentDTO;
 import com.sehati.appointment.dto.ScheduleMetaDTO;
 import com.sehati.appointment.dto.TimeSlotDTO;
 import com.sehati.appointment.dto.BlockSlotRequestDTO;
-import com.sehati.appointment.dto.BlockedSlotDTO;
 import com.sehati.appointment.dto.ManualAppointmentRequestDTO;
 import com.sehati.appointment.entities.Appointment;
+import com.sehati.appointment.entities.AnalyseAppoitement;
 import com.sehati.appointment.entities.BlockedSlot;
 import com.sehati.appointment.repository.AppointmentRepository;
 import com.sehati.appointment.repository.BlockedSlotRepository;
@@ -61,6 +61,7 @@ public class AppointmentService {
     private final com.sehati.patient.service.PatientService patientService;
     private final OrdonnancePdfService ordonnancePdfService;
     private final com.sehati.common.service.CloudinaryService cloudinaryService;
+    private final com.sehati.common.service.NotificationEmailService notificationEmailService;
 
     private static final String[] DAYS_FR = { "Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam." };
     private static final String[] MONTHS_FR = { "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août",
@@ -280,6 +281,7 @@ public class AppointmentService {
                         && t.isBefore(request.getEndTime())) {
                     app.setStatus("CANCELLED");
                     appointmentRepository.save(app);
+                    notificationEmailService.sendAppointmentCancellation(app);
                 }
             }
         }
@@ -328,7 +330,19 @@ public class AppointmentService {
         appointment.setDate(request.getDate());
         appointment.setTime(request.getTime());
         appointment.setStatus("CONFIRMED"); // Auto-confirmed logic
-        appointment.setAnalysesNames(request.getAnalysesNames());
+        
+        if (request.getAnalysesNames() != null && !request.getAnalysesNames().isEmpty()) {
+            List<AnalyseAppoitement> analyseEntities = request.getAnalysesNames().stream()
+                .filter(nom -> nom != null && !nom.trim().isEmpty())
+                .map(nom -> {
+                    AnalyseAppoitement analyse = new AnalyseAppoitement();
+                    analyse.setNom(nom);
+                    analyse.setAppointment(appointment);
+                    return analyse;
+                }).collect(Collectors.toList());
+            appointment.setAnalyses(analyseEntities);
+        }
+        
         appointment.setOrdonnanceUrl(request.getOrdonnanceUrl());
 
         if (request.getMedecinId() != null) {
@@ -377,20 +391,20 @@ public class AppointmentService {
             throw new RuntimeException("Neither medecinId nor laboratoireId provided");
         }
 
-        appointment = appointmentRepository.save(appointment);
+        Appointment savedAppointment = appointmentRepository.save(appointment);
 
         return AppointmentResponseDTO.builder()
-                .id(appointment.getId())
-                .medecinId(appointment.getMedecin() != null ? appointment.getMedecin().getId() : null)
-                .laboratoireId(appointment.getLaboratoire() != null ? appointment.getLaboratoire().getId() : null)
+                .id(savedAppointment.getId())
+                .medecinId(savedAppointment.getMedecin() != null ? savedAppointment.getMedecin().getId() : null)
+                .laboratoireId(savedAppointment.getLaboratoire() != null ? savedAppointment.getLaboratoire().getId() : null)
                 .patientId(patient.getId())
-                .analysesNames(appointment.getAnalysesNames())
-                .ordonnanceUrl(appointment.getOrdonnanceUrl())
+                .analysesNames(savedAppointment.getAnalyses() != null ? savedAppointment.getAnalyses().stream().map(AnalyseAppoitement::getNom).collect(Collectors.toList()) : new ArrayList<>())
+                .ordonnanceUrl(savedAppointment.getOrdonnanceUrl())
 
-                .date(appointment.getDate())
-                .time(appointment.getTime())
+                .date(savedAppointment.getDate())
+                .time(savedAppointment.getTime())
 
-                .status(appointment.getStatus())
+                .status(savedAppointment.getStatus())
                 .build();
     }
 
@@ -416,7 +430,7 @@ public class AppointmentService {
                     if (a.getMedecin() != null) {
                         providerName = "Dr " + a.getMedecin().getPrenom() + " " + a.getMedecin().getNom();
                         type = "Consultation";
-                        specialite = a.getMedecin().getSpecialite();
+                        specialite = a.getMedecin().getSpecialite() != null ? a.getMedecin().getSpecialite().getNom() : null;
                         address = a.getMedecin().getAdresseCabinet() != null
                                 ? a.getMedecin().getAdresseCabinet()
                                 : a.getMedecin().getVille();
@@ -445,14 +459,18 @@ public class AppointmentService {
                 .collect(Collectors.toList());
     }
 
-    public Page<PatientAppointmentDTO> getMyPastAppointments(Long userId, Pageable pageable) {
+    public Page<PatientAppointmentDTO> getMyPastAppointments(Long userId, String typeFilter, String search, Pageable pageable) {
         Patient patient = patientRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Patient not found for user ID: " + userId));
 
         LocalDate today = LocalDate.now();
+
+        // Normalise le filtre type : "Tous" ou vide → null pour la query
+        String normalizedType = (typeFilter == null || typeFilter.isBlank() || "Tous".equalsIgnoreCase(typeFilter))
+                ? null : typeFilter;
+
         Page<Appointment> appointments = appointmentRepository
-                .findByPatientIdAndStatusAndDateBeforeOrderByDateDescTimeDesc(patient.getId(), "COMPLETED", today,
-                        pageable);
+                .searchPatientHistory(patient.getId(), "COMPLETED", today, normalizedType, search, pageable);
 
         List<PatientAppointmentDTO> dtoList = appointments.stream()
                 .map(a -> {
@@ -466,7 +484,7 @@ public class AppointmentService {
                     if (a.getMedecin() != null) {
                         providerName = "Dr " + a.getMedecin().getPrenom() + " " + a.getMedecin().getNom();
                         type = "Médecin";
-                        specialite = a.getMedecin().getSpecialite();
+                        specialite = a.getMedecin().getSpecialite() != null ? a.getMedecin().getSpecialite().getNom() : null;
                         address = a.getMedecin().getAdresseCabinet() != null
                                 ? a.getMedecin().getAdresseCabinet()
                                 : a.getMedecin().getVille();
@@ -535,6 +553,7 @@ public class AppointmentService {
 
         appointment.setStatus("CANCELLED");
         appointmentRepository.save(appointment);
+        notificationEmailService.sendAppointmentCancellation(appointment);
     }
 
     @Transactional
@@ -564,6 +583,7 @@ public class AppointmentService {
         appointment.setResultUrl(resultUrl);
         appointment.setStatus("COMPLETED");
         appointmentRepository.save(appointment);
+        notificationEmailService.sendResultsAvailable(appointment);
     }
 
     @Transactional
@@ -771,6 +791,40 @@ public class AppointmentService {
         int slotDuration = labo.getConsultationTime() != null ? labo.getConsultationTime() : 15;
         return buildScheduleMeta(labo.getWorkHours(), slotDuration);
     }
+    public List<String> getPendingPastDates(Long userId, String role) {
+        Long ownerId = userId;
+        String ownerType = role;
+
+        if ("SECRETAIRE".equals(role)) {
+            Secretaire secretaire = secretaireRepository.findByUserId(userId)
+                    .orElseThrow(() -> new RuntimeException("Secretaire not found"));
+            MedecinSecretaire relation = medecinSecretaireRepository
+                    .findBySecretaireUserIdAndStatus(secretaire.getUser().getId(), "ACTIVE")
+                    .orElseThrow(() -> new RuntimeException("Aucune relation active pour cette secrétaire"));
+            ownerId = relation.getMedecin().getId();
+            ownerType = "MEDECIN";
+        } else if ("MEDECIN".equals(role)) {
+            Medecin medecin = medecinRepository.findByUserId(userId)
+                    .orElseThrow(() -> new RuntimeException("Medecin not found"));
+            ownerId = medecin.getId();
+        } else if ("LABORATOIRE".equals(role)) {
+            Laboratoire labo = laboratoireRepository.findByUserId(userId)
+                    .orElseThrow(() -> new RuntimeException("Laboratoire not found"));
+            ownerId = labo.getId();
+        }
+
+        List<LocalDate> dates = new ArrayList<>();
+        if ("MEDECIN".equals(ownerType)) {
+            dates = appointmentRepository.findDatesWithPendingPastAppointmentsForMedecin(ownerId);
+        } else if ("LABORATOIRE".equals(ownerType)) {
+            dates = appointmentRepository.findDatesWithPendingPastAppointmentsForLabo(ownerId);
+        }
+
+        return dates.stream()
+                .map(LocalDate::toString)
+                .collect(Collectors.toList());
+    }
+
 
     // =========================================================
     // Détails d'un rendez-vous pour le professionnel
@@ -806,7 +860,7 @@ public class AppointmentService {
                 .time(appointment.getTime())
                 .status(appointment.getStatus())
                 .consultationNotes(appointment.getConsultationNotes())
-                .analysesNames(appointment.getAnalysesNames())
+                .analysesNames(appointment.getAnalyses() != null ? appointment.getAnalyses().stream().map(AnalyseAppoitement::getNom).collect(Collectors.toList()) : new ArrayList<>())
                 .ordonnanceUrl(appointment.getOrdonnanceUrl())
                 .resultUrl(appointment.getResultUrl())
                 .hasHistory(hasHistory)
@@ -827,7 +881,7 @@ public class AppointmentService {
                 .date(appointment.getDate())
                 .time(appointment.getTime())
                 .status(appointment.getStatus())
-                .analysesNames(appointment.getAnalysesNames())
+                .analysesNames(appointment.getAnalyses() != null ? appointment.getAnalyses().stream().map(AnalyseAppoitement::getNom).collect(Collectors.toList()) : new ArrayList<>())
                 .build();
     }
 
@@ -952,6 +1006,21 @@ public class AppointmentService {
                 .time(appointment.getTime())
                 .status(appointment.getStatus())
                 .build();
+    }
+
+    /**
+     * Vérifie si un patient a au moins un rendez-vous COMPLETED
+     * avec un médecin ou un laboratoire donné.
+     * Exposé pour le module Review.
+     */
+    public boolean hasCompletedAppointment(Long patientId, Long targetId, String targetType) {
+        return switch (targetType) {
+            case "MEDECIN" -> appointmentRepository
+                    .existsByPatientIdAndMedecinIdAndStatus(patientId, targetId, "COMPLETED");
+            case "LABORATORY" -> appointmentRepository
+                    .existsByPatientIdAndLaboratoireIdAndStatus(patientId, targetId, "COMPLETED");
+            default -> false;
+        };
     }
 
     public Long getMedecinIdFromUserId(Long userId) {

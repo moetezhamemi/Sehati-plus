@@ -38,13 +38,14 @@ public class MedecinService {
 
     private final MedecinRepository medecinRepository;
     private final ReviewRepository reviewRepository;
+    private final SpecialiteService specialiteService;
 
     @Transactional
     public void createMedecinProfile(User savedUser, SignupMedecinRequest request) {
         Medecin medecin = new Medecin();
         medecin.setNom(request.getNom());
         medecin.setPrenom(request.getPrenom());
-        medecin.setSpecialite(request.getSpecialite());
+        medecin.setSpecialite(specialiteService.getOrCreateSpecialite(request.getSpecialite()));
         medecin.setAdresseCabinet(request.getAdresseCabinet());
         medecin.setVille(request.getVille());
 
@@ -103,7 +104,7 @@ public class MedecinService {
                 .id(medecin.getId())
                 .nom(medecin.getNom())
                 .prenom(medecin.getPrenom())
-                .specialite(medecin.getSpecialite())
+                .specialite(medecin.getSpecialite() != null ? medecin.getSpecialite().getNom() : null)
                 .adresseCabinet(medecin.getAdresseCabinet())
                 .ville(medecin.getVille())
                 .phones(medecin.getPhones() != null
@@ -151,7 +152,7 @@ public class MedecinService {
                     .id(medecin.getId())
                     .nom(medecin.getNom())
                     .prenom(medecin.getPrenom())
-                    .specialite(medecin.getSpecialite())
+                    .specialite(medecin.getSpecialite() != null ? medecin.getSpecialite().getNom() : null)
                     .adresseCabinet(medecin.getAdresseCabinet())
                     .ville(medecin.getVille())
                     .phones(medecin.getPhones() != null
@@ -165,7 +166,7 @@ public class MedecinService {
             logger.error("Error mapping doctor summary for ID {}: {}", medecin.getId(), e.getMessage());
             return MedecinSummaryDTO.builder()
                     .id(medecin.getId()).nom(medecin.getNom()).prenom(medecin.getPrenom())
-                    .specialite(medecin.getSpecialite()).averageRating(0.0).reviewCount(0L).build();
+                    .specialite(medecin.getSpecialite() != null ? medecin.getSpecialite().getNom() : null).averageRating(0.0).reviewCount(0L).build();
         }
     }
 
@@ -292,7 +293,7 @@ public class MedecinService {
                 .nom(medecin.getNom())
                 .prenom(medecin.getPrenom())
                 .email(email)
-                .specialite(medecin.getSpecialite())
+                .specialite(medecin.getSpecialite() != null ? medecin.getSpecialite().getNom() : null)
                 .biographie(medecin.getBiographie())
                 .photoProfilUrl(medecin.getPhotoProfilUrl())
                 .signatureUrl(medecin.getSignatureUrl())

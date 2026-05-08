@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -23,7 +24,7 @@ public class AppointmentDetailDTO {
     private LocalTime time;
     private String status;
     private String consultationNotes;
-    private String analysesNames;
+    private List<String> analysesNames;
     private String ordonnanceUrl;
     private String resultUrl;
     private boolean hasHistory;

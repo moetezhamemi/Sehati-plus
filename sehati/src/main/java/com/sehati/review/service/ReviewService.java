@@ -1,5 +1,6 @@
 package com.sehati.review.service;
 
+import com.sehati.appointment.service.AppointmentService;
 import com.sehati.common.exception.BusinessException;
 import com.sehati.laboratoire.service.LaboratoireService;
 import com.sehati.medecin.service.MedecinService;
@@ -26,6 +27,7 @@ public class ReviewService {
     private final PatientRepository patientRepository;
     private final MedecinService medecinService;
     private final LaboratoireService laboratoireService;
+    private final AppointmentService appointmentService;
 
     @Transactional
     public ReviewResponseDTO createReview(ReviewRequestDTO request, Long userId) {
@@ -36,7 +38,14 @@ public class ReviewService {
         // 2. Validate Target Existence via Domain Services
         validateTargetExistence(request.getTargetId(), request.getTargetType());
 
-        // 3. Prevent Duplicate Reviews (One review per patient per target)
+        // 3. Must have had a COMPLETED appointment
+        boolean hasCompletedAppointment = appointmentService.hasCompletedAppointment(
+                patient.getId(), request.getTargetId(), request.getTargetType().name());
+        if (!hasCompletedAppointment) {
+            throw new BusinessException("You must have a completed appointment before leaving a review.");
+        }
+
+        // 4. Prevent Duplicate Reviews (One review per patient per target)
         if (reviewRepository.existsByReviewerIdAndTargetIdAndTargetType(
                 patient.getId(), request.getTargetId(), request.getTargetType())) {
             throw new BusinessException("You have already reviewed this " + request.getTargetType().name().toLowerCase() + ".");
@@ -86,9 +95,9 @@ public class ReviewService {
             return new EligibilityResponseDTO(false, false, null);
         }
 
-        // 3. Must have had an appointment with the target
-        // TODO: replace with real appointment check when Appointment module is ready
-        boolean hasCompletedAppointment = true; // Mocked properly
+        // 3. Must have had a COMPLETED appointment with the target
+        boolean hasCompletedAppointment = appointmentService.hasCompletedAppointment(
+                patient.getId(), targetId, targetType.name());
 
         if (!hasCompletedAppointment) {
             return new EligibilityResponseDTO(false, false, null);

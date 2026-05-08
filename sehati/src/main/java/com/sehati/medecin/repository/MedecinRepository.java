@@ -16,10 +16,10 @@ public interface MedecinRepository extends JpaRepository<Medecin, Long> {
     @Query("SELECT m FROM Medecin m JOIN m.user u WHERE u.enabled = true AND u.status = 'APPROVED'")
     Page<Medecin> findAllApprovedAndEnabled(Pageable pageable);
 
-    @Query("SELECT m FROM Medecin m JOIN m.user u WHERE u.enabled = true AND u.status = 'APPROVED' " +
+    @Query("SELECT m FROM Medecin m JOIN m.user u LEFT JOIN m.specialite s WHERE u.enabled = true AND u.status = 'APPROVED' " +
            "AND (:search IS NULL OR LOWER(m.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(m.prenom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(CONCAT(m.nom, ' ', m.prenom)) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:ville IS NULL OR LOWER(m.ville) = LOWER(:ville)) " +
-           "AND (:specialite IS NULL OR LOWER(m.specialite) = LOWER(:specialite))")
+           "AND (:specialite IS NULL OR LOWER(s.nom) = LOWER(:specialite))")
     Page<Medecin> searchApproved(@org.springframework.data.repository.query.Param("search") String search, 
                                  @org.springframework.data.repository.query.Param("ville") String ville, 
                                  @org.springframework.data.repository.query.Param("specialite") String specialite, 
@@ -28,7 +28,7 @@ public interface MedecinRepository extends JpaRepository<Medecin, Long> {
     @Query("SELECT DISTINCT m.ville FROM Medecin m JOIN m.user u WHERE u.enabled = true AND u.status = 'APPROVED' AND m.ville IS NOT NULL ORDER BY m.ville")
     java.util.List<String> findDistinctVilles();
 
-    @Query("SELECT DISTINCT m.specialite FROM Medecin m JOIN m.user u WHERE u.enabled = true AND u.status = 'APPROVED' AND m.specialite IS NOT NULL ORDER BY m.specialite")
+    @Query("SELECT DISTINCT s.nom FROM Medecin m JOIN m.user u JOIN m.specialite s WHERE u.enabled = true AND u.status = 'APPROVED' ORDER BY s.nom")
     java.util.List<String> findDistinctSpecialites();
 
     Optional<Medecin> findByUserId(Long userId);

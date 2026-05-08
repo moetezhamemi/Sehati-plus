@@ -16,10 +16,13 @@ import com.sehati.auth.dto.GoogleAuthRequest;
 import com.sehati.auth.dto.LoginRequest;
 import com.sehati.auth.dto.OtpRequest;
 import com.sehati.auth.dto.OtpVerifyRequest;
+import com.sehati.auth.dto.PatientRegistrationResponse;
 import com.sehati.auth.dto.ResetPasswordOtpRequest;
 import com.sehati.auth.dto.SignupLaboRequest;
 import com.sehati.auth.dto.SignupMedecinRequest;
 import com.sehati.auth.dto.SignupPatientRequest;
+import com.sehati.auth.dto.SmsOtpRequest;
+import com.sehati.auth.dto.SmsOtpVerifyRequest;
 import com.sehati.auth.security.UserDetailsImpl;
 import com.sehati.auth.service.AuthService;
 import com.sehati.common.dto.ApiResponse;
@@ -42,8 +45,9 @@ public class AuthController {
     }
 
     @PostMapping("/signup/patient")
-    public ResponseEntity<ApiResponse<Void>> registerPatient(@Valid @RequestBody SignupPatientRequest signUpRequest) {
-        return ResponseEntity.ok(ApiResponse.success(authService.registerPatient(signUpRequest), null));
+    public ResponseEntity<ApiResponse<PatientRegistrationResponse>> registerPatient(@Valid @RequestBody SignupPatientRequest signUpRequest) {
+        PatientRegistrationResponse response = authService.registerPatient(signUpRequest);
+        return ResponseEntity.ok(ApiResponse.success(response.getMessage(), response));
     }
 
     @PostMapping("/signup/medecin")
@@ -104,5 +108,20 @@ public class AuthController {
     public ResponseEntity<ApiResponse<?>> setupSecretairePassword(@Valid @RequestBody com.sehati.auth.dto.SecretaireSetupPasswordRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Mot de passe enregistré avec succès, vous allez être redirigé.", authService.setupSecretairePassword(request)));
     }
-}
 
+    // =========================================================
+    // SMS OTP — Liaison dossier médical existant
+    // =========================================================
+
+    @PostMapping("/send-sms-otp")
+    public ResponseEntity<ApiResponse<Void>> sendSmsOtp(@Valid @RequestBody SmsOtpRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                authService.sendSmsOtp(request.getTelephone(), request.getEmail()), null));
+    }
+
+    @PostMapping("/verify-sms-otp")
+    public ResponseEntity<ApiResponse<?>> verifySmsOtp(@Valid @RequestBody SmsOtpVerifyRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Vérification réussie",
+                authService.verifySmsOtp(request.getTelephone(), request.getCode(), request.getEmail())));
+    }
+}
