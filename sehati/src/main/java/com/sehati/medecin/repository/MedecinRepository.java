@@ -32,4 +32,7 @@ public interface MedecinRepository extends JpaRepository<Medecin, Long> {
     java.util.List<String> findDistinctSpecialites();
 
     Optional<Medecin> findByUserId(Long userId);
+
+    @Query("SELECT m.ville, COUNT(m.id) FROM Medecin m WHERE m.ville IS NOT NULL GROUP BY m.ville")
+    java.util.List<Object[]> countMedecinsByVille();
 }

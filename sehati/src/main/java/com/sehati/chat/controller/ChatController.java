@@ -43,12 +43,14 @@ public class ChatController {
         MessageResponse response = chatService.sendMessage(user.getId(), request);
         
         // Push message to receiver via WebSocket
+        // Use the receiver's email (= Spring Security principal name), NOT the numeric ID
+        String receiverEmail = chatService.getUserEmail(response.getReceiverId());
         messagingTemplate.convertAndSendToUser(
-                response.getReceiverId().toString(), 
-                "/queue/messages", 
+                receiverEmail,
+                "/queue/messages",
                 response
         );
-        
+
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -59,8 +61,9 @@ public class ChatController {
         // Notify counterpart that messages were read
         try {
             User counterpart = chatService.getCounterpart(user.getId());
+            // Use the counterpart's email (= Spring Security principal name)
             messagingTemplate.convertAndSendToUser(
-                    counterpart.getId().toString(),
+                    counterpart.getEmail(),
                     "/queue/read-receipts",
                     user.getId()
             );
@@ -76,9 +79,11 @@ public class ChatController {
         MessageResponse response = chatService.deleteMessage(id, user.getId());
         
         // Notify receiver of deletion
+        // Use the receiver's email (= Spring Security principal name), NOT the numeric ID
+        String receiverEmail = chatService.getUserEmail(response.getReceiverId());
         messagingTemplate.convertAndSendToUser(
-                response.getReceiverId().toString(), 
-                "/queue/messages", 
+                receiverEmail,
+                "/queue/messages",
                 response
         );
         

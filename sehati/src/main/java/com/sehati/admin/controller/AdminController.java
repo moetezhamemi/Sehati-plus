@@ -27,7 +27,7 @@ public class AdminController {
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Page<UserAdminProjection>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String role,
             @RequestParam(required = false) String status,
@@ -40,7 +40,7 @@ public class AdminController {
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Page<UserAdminProjection>> getRequests(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String role,
             @RequestParam(required = false) String specialite) {

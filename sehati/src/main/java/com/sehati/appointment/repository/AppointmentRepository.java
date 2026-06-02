@@ -115,4 +115,36 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             @Param("date") LocalDate date,
             @Param("startTime") java.time.LocalTime startTime,
             @Param("endTime") java.time.LocalTime endTime);
+
+    // --- Dashboard Admin Global ---
+
+    // Comptage total RDV sur une plage de dates (mois courant)
+    long countByDateBetween(LocalDate start, LocalDate end);
+
+    // Comptage global par statut (tous professionnels confondus)
+    long countByStatus(String status);
+
+    // Évolution mensuelle RDV médecins pour une année donnée
+    @Query("SELECT MONTH(a.date), COUNT(a) FROM Appointment a " +
+           "WHERE a.medecin IS NOT NULL AND YEAR(a.date) = :year " +
+           "GROUP BY MONTH(a.date) ORDER BY MONTH(a.date)")
+    List<Object[]> countMedecinAppointmentsByMonth(@Param("year") int year);
+
+    // Évolution mensuelle RDV laboratoires pour une année donnée
+    @Query("SELECT MONTH(a.date), COUNT(a) FROM Appointment a " +
+           "WHERE a.laboratoire IS NOT NULL AND YEAR(a.date) = :year " +
+           "GROUP BY MONTH(a.date) ORDER BY MONTH(a.date)")
+    List<Object[]> countLaboAppointmentsByMonth(@Param("year") int year);
+
+    // Évolution par jour RDV médecins pour un mois/année donné
+    @Query("SELECT DAY(a.date), COUNT(a) FROM Appointment a " +
+           "WHERE a.medecin IS NOT NULL AND YEAR(a.date) = :year AND MONTH(a.date) = :month " +
+           "GROUP BY DAY(a.date) ORDER BY DAY(a.date)")
+    List<Object[]> countMedecinAppointmentsByDay(@Param("year") int year, @Param("month") int month);
+
+    // Évolution par jour RDV laboratoires pour un mois/année donné
+    @Query("SELECT DAY(a.date), COUNT(a) FROM Appointment a " +
+           "WHERE a.laboratoire IS NOT NULL AND YEAR(a.date) = :year AND MONTH(a.date) = :month " +
+           "GROUP BY DAY(a.date) ORDER BY DAY(a.date)")
+    List<Object[]> countLaboAppointmentsByDay(@Param("year") int year, @Param("month") int month);
 }

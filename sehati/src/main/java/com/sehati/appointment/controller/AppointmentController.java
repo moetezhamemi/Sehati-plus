@@ -327,7 +327,7 @@ public class AppointmentController {
     // =========================================================
 
     @PostMapping("/manual-create")
-    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE')")
+    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE', 'LABORATOIRE')")
     public ResponseEntity<AppointmentResponseDTO> createManualAppointment(
             @RequestBody com.sehati.appointment.dto.ManualAppointmentRequestDTO request,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -335,13 +335,15 @@ public class AppointmentController {
         String role = "MEDECIN";
         if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SECRETAIRE"))) {
             role = "SECRETAIRE";
+        } else if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("LABORATOIRE"))) {
+            role = "LABORATOIRE";
         }
 
         AppointmentResponseDTO response = appointmentService.createManualAppointment(userDetails.getId(), role, request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
     @GetMapping("/my-available-slots")
-    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE')")
+    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE', 'LABORATOIRE')")
     public ResponseEntity<List<com.sehati.appointment.dto.TimeSlotDTO>> getMyAvailableSlots(
             @RequestParam LocalDate date,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -349,15 +351,21 @@ public class AppointmentController {
         String role = "MEDECIN";
         if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SECRETAIRE"))) {
             role = "SECRETAIRE";
+        } else if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("LABORATOIRE"))) {
+            role = "LABORATOIRE";
         }
         
-        Long medecinId;
-        if ("MEDECIN".equals(role)) {
-            medecinId = appointmentService.getMedecinIdFromUserId(userDetails.getId());
+        if ("LABORATOIRE".equals(role)) {
+            Long laboId = appointmentService.getLaboIdFromUserId(userDetails.getId());
+            return ResponseEntity.ok(appointmentService.getAvailableLaboTimeSlots(laboId, date));
         } else {
-            medecinId = appointmentService.getMedecinIdFromSecretaireUserId(userDetails.getId());
+            Long medecinId;
+            if ("MEDECIN".equals(role)) {
+                medecinId = appointmentService.getMedecinIdFromUserId(userDetails.getId());
+            } else {
+                medecinId = appointmentService.getMedecinIdFromSecretaireUserId(userDetails.getId());
+            }
+            return ResponseEntity.ok(appointmentService.getAvailableTimeSlots(medecinId, date));
         }
-        
-        return ResponseEntity.ok(appointmentService.getAvailableTimeSlots(medecinId, date));
     }
 }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
+
 <head>
     <meta charset="UTF-8" />
     <title>Ordonnance</title>
@@ -8,6 +9,7 @@
             size: A5;
             margin: 0;
         }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
@@ -27,10 +29,12 @@
             padding-bottom: 14px;
             margin-bottom: 20px;
         }
+
         .doctor-info {
             vertical-align: top;
             text-align: left;
         }
+
         .doctor-info h1 {
             color: #1c3c9c;
             margin: 0 0 4px 0;
@@ -38,15 +42,18 @@
             font-weight: bold;
             letter-spacing: 0.2px;
         }
+
         .doctor-info p {
             margin: 0;
             font-size: 13px;
             color: #666;
         }
+
         .logo-cell {
             vertical-align: top;
             text-align: right;
         }
+
         .logo-img {
             max-width: 65px;
             max-height: 55px;
@@ -57,6 +64,7 @@
             width: 100%;
             margin-bottom: 30px;
         }
+
         .meta-left {
             vertical-align: top;
             text-align: left;
@@ -65,6 +73,7 @@
             color: #222;
             padding-left: 5px;
         }
+
         .meta-right {
             vertical-align: top;
             text-align: right;
@@ -81,6 +90,7 @@
             padding-left: 20px;
             z-index: 1;
         }
+
         .watermark {
             position: absolute;
             top: 42%;
@@ -90,9 +100,11 @@
             opacity: 0.08;
             z-index: -1;
         }
+
         .medication-item {
             margin-bottom: 12px;
         }
+
         .medication-name {
             font-weight: bold;
             font-style: italic;
@@ -100,6 +112,7 @@
             margin: 0 0 3px 0;
             color: #222;
         }
+
         .medication-posology {
             margin: 0 0 0 10px;
             font-size: 12.5px;
@@ -114,23 +127,27 @@
             padding-right: 28px;
             position: relative;
         }
+
         .signature-content {
             display: inline-block;
             text-align: center;
             position: relative;
             min-width: 120px;
         }
+
         .signature-title {
             font-weight: bold;
             font-size: 13px;
             color: #222;
         }
+
         .signature-img {
             max-width: 110px;
             max-height: 55px;
             display: block;
             margin: 6px auto 0;
         }
+
         .cachet-img {
             max-width: 90px;
             max-height: 90px;
@@ -151,22 +168,26 @@
             border-top: 2.5px solid #1c3c9c;
             padding-top: 10px;
         }
+
         .footer-item {
             margin-bottom: 6px;
             font-size: 11.5px;
             color: #333;
         }
+
         .footer-icon {
             width: 14px;
             height: 14px;
             margin-right: 8px;
             vertical-align: middle;
         }
+
         .footer-text {
             vertical-align: middle;
         }
     </style>
 </head>
+
 <body>
 
     <!-- ===== EN-TÊTE ===== -->
@@ -177,7 +198,8 @@
                 <p th:text="${specialiteMedecin}">[Spécialité du médecin]</p>
             </td>
             <td class="logo-cell">
-                <img src="/images/Logo_sehhati+.png" th:src="@{classpath:static/images/Logo_sehhati+.png}" class="logo-img" alt="Logo Sehati+" />
+                <img src="/images/Logo_sehhati+.png" th:src="@{classpath:static/images/Logo_sehhati+.png}"
+                    class="logo-img" alt="Logo Sehati+" />
             </td>
         </tr>
     </table>
@@ -198,13 +220,15 @@
     <div class="prescription-body">
 
         <!-- Filigrane centré -->
-        <img src="/images/logo_noir_et_blanc.png" th:src="@{classpath:static/images/logo_noir_et_blanc.png}" class="watermark" alt="Watermark" />
+        <img src="/images/logo_noir_et_blanc.png" th:src="@{classpath:static/images/logo_noir_et_blanc.png}"
+            class="watermark" alt="Watermark" />
 
         <!-- Liste dynamique injectée par Thymeleaf -->
         <div th:each="med : ${medicaments}">
             <div class="medication-item">
                 <p class="medication-name">- <span th:text="${med.nom}">médicament</span></p>
-                <p class="medication-posology" th:if="${med.posologie != null and !med.posologie.isEmpty()}" th:text="${med.posologie}">posologie</p>
+                <p class="medication-posology" th:if="${med.posologie != null and !med.posologie.isEmpty()}"
+                    th:text="${med.posologie}">posologie</p>
             </div>
         </div>
 
@@ -230,7 +254,8 @@
     <div class="signature-section">
         <div class="signature-content">
             <div class="signature-title">Signature</div>
-            <img th:if="${signatureMedecin != null}" th:src="${signatureMedecin}" class="signature-img" alt="Signature" />
+            <img th:if="${signatureMedecin != null}" th:src="${signatureMedecin}" class="signature-img"
+                alt="Signature" />
             <img th:if="${cachetMedecin != null}" th:src="${cachetMedecin}" class="cachet-img" alt="Cachet" />
         </div>
     </div>
@@ -240,18 +265,21 @@
         <div class="footer-item">
             <!-- Icône pin localisation remplie (Material Design) -->
             <svg class="footer-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="14" height="14">
-                <path fill="#1c3c9c" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                <path fill="#1c3c9c"
+                    d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
             </svg>
             <span class="footer-text" th:text="${adresseMedecin}">24, Adresse du médecin</span>
         </div>
         <div class="footer-item">
             <!-- Icône téléphone remplie (Material Design) -->
             <svg class="footer-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="14" height="14">
-                <path fill="#1c3c9c" d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+                <path fill="#1c3c9c"
+                    d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
             </svg>
             <span class="footer-text" th:text="${telephoneMedecin}">72 000 000 - 56 000 100</span>
         </div>
     </div>
 
 </body>
+
 </html>

@@ -222,7 +222,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Créez votre compte Sehhati+ en quelques étapes',
+              'Créez votre compte Sehati+ en quelques étapes',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,

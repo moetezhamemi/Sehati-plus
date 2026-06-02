@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 public class ManualAppointmentRequestDTO {
@@ -19,4 +20,6 @@ public class ManualAppointmentRequestDTO {
     @NotNull(message = "L'heure est obligatoire")
     @JsonFormat(pattern = "HH:mm")
     private LocalTime time;
+
+    private List<String> analysesNames;
 }

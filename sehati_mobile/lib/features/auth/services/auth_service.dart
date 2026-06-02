@@ -10,7 +10,7 @@ class AuthService {
   static const _tokenKey = 'auth_token';
   static const _roleKey = 'user_role';
 
-  // ⚠️ CRITIQUE : serverClientId DOIT être le "Web Client ID" du backend.
+  // CRITIQUE : serverClientId DOIT être le "Web Client ID" du backend.
   // Si idToken est null, c'est que ce Client ID n'est pas bon.
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     serverClientId: '410643837425-moltq75eoklghmcmevv1enkn5gesbt0b.apps.googleusercontent.com', 
@@ -84,7 +84,7 @@ class AuthService {
       final String? idToken = googleAuth.idToken;
 
       if (idToken == null) {
-        debugPrint('⚠️ ERREUR: idToken est NULL. Le serverClientId configuré dans auth_service.dart DOIT être le Client ID "Application Web" de Google Cloud Console, PAS le Client ID "Android".');
+        debugPrint(' ERREUR: idToken est NULL. Le serverClientId configuré dans auth_service.dart DOIT être le Client ID "Application Web" de Google Cloud Console, PAS le Client ID "Android".');
         return {'success': false, 'message': 'Impossible de récupérer le token Google (Client ID Web invalide)'};
       }
 

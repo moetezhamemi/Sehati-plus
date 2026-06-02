@@ -73,7 +73,7 @@ public class PatientController {
     // =========================================================
 
     @GetMapping("/search-by-phone")
-    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE')")
+    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE', 'LABORATOIRE')")
     public ResponseEntity<ProfessionalPatientDTO> searchByPhone(
             @RequestParam String telephone) {
         return patientService.searchByTelephone(telephone)
@@ -82,14 +82,14 @@ public class PatientController {
     }
 
     @GetMapping("/search-by-name")
-    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE')")
+    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE', 'LABORATOIRE')")
     public ResponseEntity<List<ProfessionalPatientDTO>> searchByName(
             @RequestParam String query) {
         return ResponseEntity.ok(patientService.searchByFullName(query));
     }
 
     @PostMapping("/create-manual")
-    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE')")
+    @PreAuthorize("hasAnyAuthority('MEDECIN', 'SECRETAIRE', 'LABORATOIRE')")
     public ResponseEntity<ProfessionalPatientDTO> createPatientManually(
             @Valid @RequestBody CreatePatientDTO dto) {
         return new ResponseEntity<>(patientService.createPatientManually(dto), HttpStatus.CREATED);

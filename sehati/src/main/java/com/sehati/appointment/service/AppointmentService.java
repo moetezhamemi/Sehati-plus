@@ -941,8 +941,10 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO createManualAppointment(Long userId, String role, ManualAppointmentRequestDTO request) {
-        // Resolve medecinId based on role
-        Long medecinId;
+        // Resolve medecinId or laboratoireId based on role
+        Long medecinId = null;
+        Long laboratoireId = null;
+
         if ("MEDECIN".equals(role)) {
             Medecin medecin = medecinRepository.findByUserId(userId)
                     .orElseThrow(() -> new RuntimeException("Médecin introuvable"));
@@ -954,12 +956,13 @@ public class AppointmentService {
                     .findBySecretaireUserIdAndStatus(secretaire.getUser().getId(), "ACTIVE")
                     .orElseThrow(() -> new RuntimeException("Aucune relation active pour cette secrétaire"));
             medecinId = relation.getMedecin().getId();
+        } else if ("LABORATOIRE".equals(role)) {
+            Laboratoire labo = laboratoireRepository.findByUserId(userId)
+                    .orElseThrow(() -> new RuntimeException("Laboratoire introuvable"));
+            laboratoireId = labo.getId();
         } else {
             throw new RuntimeException("Rôle non autorisé pour la création manuelle de RDV");
         }
-
-        Medecin medecin = medecinRepository.findById(medecinId)
-                .orElseThrow(() -> new RuntimeException("Médecin introuvable"));
 
         Patient patient;
         if (request.getPatientId() != null) {
@@ -974,37 +977,79 @@ public class AppointmentService {
             throw new RuntimeException("Les informations du patient sont obligatoires");
         }
 
-        // Check slot availability
-        List<Appointment> existing = appointmentRepository.findByMedecinIdAndDateAndStatus(
-                medecinId, request.getDate(), "CONFIRMED");
-        if (existing.stream().anyMatch(app -> app.getTime().equals(request.getTime()))) {
-            throw new RuntimeException("Ce créneau est déjà pris");
-        }
-
-        List<BlockedSlot> blockedSlots = blockedSlotRepository.findByOwnerIdAndOwnerTypeAndDate(
-                medecinId, "MEDECIN", request.getDate());
-        if (blockedSlots.stream().anyMatch(
-                b -> (request.getTime().equals(b.getStartTime()) || request.getTime().isAfter(b.getStartTime()))
-                        && request.getTime().isBefore(b.getEndTime()))) {
-            throw new RuntimeException("Ce créneau est bloqué");
-        }
-
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
-        appointment.setMedecin(medecin);
         appointment.setDate(request.getDate());
         appointment.setTime(request.getTime());
         appointment.setStatus("CONFIRMED");
 
-        appointment = appointmentRepository.save(appointment);
+        if (request.getAnalysesNames() != null && !request.getAnalysesNames().isEmpty()) {
+            List<AnalyseAppoitement> analyseEntities = request.getAnalysesNames().stream()
+                .filter(nom -> nom != null && !nom.trim().isEmpty())
+                .map(nom -> {
+                    AnalyseAppoitement analyse = new AnalyseAppoitement();
+                    analyse.setNom(nom);
+                    analyse.setAppointment(appointment);
+                    return analyse;
+                }).collect(Collectors.toList());
+            appointment.setAnalyses(analyseEntities);
+        }
+
+        if (medecinId != null) {
+            Medecin medecin = medecinRepository.findById(medecinId)
+                    .orElseThrow(() -> new RuntimeException("Médecin introuvable"));
+
+            // Check slot availability
+            List<Appointment> existing = appointmentRepository.findByMedecinIdAndDateAndStatus(
+                    medecinId, request.getDate(), "CONFIRMED");
+            if (existing.stream().anyMatch(app -> app.getTime().equals(request.getTime()))) {
+                throw new RuntimeException("Ce créneau est déjà pris");
+            }
+
+            List<BlockedSlot> blockedSlots = blockedSlotRepository.findByOwnerIdAndOwnerTypeAndDate(
+                    medecinId, "MEDECIN", request.getDate());
+            if (blockedSlots.stream().anyMatch(
+                    b -> (request.getTime().equals(b.getStartTime()) || request.getTime().isAfter(b.getStartTime()))
+                            && request.getTime().isBefore(b.getEndTime()))) {
+                throw new RuntimeException("Ce créneau est bloqué");
+            }
+
+            appointment.setMedecin(medecin);
+        } else if (laboratoireId != null) {
+            Laboratoire labo = laboratoireRepository.findById(laboratoireId)
+                    .orElseThrow(() -> new RuntimeException("Laboratoire introuvable"));
+
+            List<Appointment> existing = appointmentRepository.findByLaboratoireIdAndDateAndStatus(
+                    laboratoireId, request.getDate(), "CONFIRMED");
+
+            int capacite = labo.getCapaciteParCreneau() != null ? labo.getCapaciteParCreneau() : 1;
+            long bookingsAtSlot = existing.stream().filter(app -> app.getTime().equals(request.getTime())).count();
+
+            if (bookingsAtSlot >= capacite) {
+                throw new RuntimeException("Ce créneau est déjà complet pour le laboratoire");
+            }
+
+            List<BlockedSlot> blockedSlots = blockedSlotRepository.findByOwnerIdAndOwnerTypeAndDate(
+                    laboratoireId, "LABORATOIRE", request.getDate());
+            if (blockedSlots.stream().anyMatch(
+                    b -> (request.getTime().equals(b.getStartTime()) || request.getTime().isAfter(b.getStartTime()))
+                            && request.getTime().isBefore(b.getEndTime()))) {
+                throw new RuntimeException("Ce créneau est bloqué");
+            }
+
+            appointment.setLaboratoire(labo);
+        }
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
 
         return AppointmentResponseDTO.builder()
-                .id(appointment.getId())
-                .medecinId(medecin.getId())
+                .id(savedAppointment.getId())
+                .medecinId(savedAppointment.getMedecin() != null ? savedAppointment.getMedecin().getId() : null)
+                .laboratoireId(savedAppointment.getLaboratoire() != null ? savedAppointment.getLaboratoire().getId() : null)
                 .patientId(patient.getId())
-                .date(appointment.getDate())
-                .time(appointment.getTime())
-                .status(appointment.getStatus())
+                .date(savedAppointment.getDate())
+                .time(savedAppointment.getTime())
+                .status(savedAppointment.getStatus())
                 .build();
     }
 
@@ -1036,5 +1081,11 @@ public class AppointmentService {
                 .findBySecretaireUserIdAndStatus(secretaire.getUser().getId(), "ACTIVE")
                 .orElseThrow(() -> new RuntimeException("Aucune relation active pour cette secrétaire"));
         return relation.getMedecin().getId();
+    }
+
+    public Long getLaboIdFromUserId(Long userId) {
+        return laboratoireRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Laboratoire introuvable"))
+                .getId();
     }
 }

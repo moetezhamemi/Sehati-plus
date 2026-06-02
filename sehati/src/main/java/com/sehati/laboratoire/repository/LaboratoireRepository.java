@@ -23,4 +23,7 @@ public interface LaboratoireRepository extends JpaRepository<Laboratoire, Long> 
                                      Pageable pageable);
 
     Optional<Laboratoire> findByUserId(Long userId);
+
+    @Query("SELECT l.ville, COUNT(l.id) FROM Laboratoire l WHERE l.ville IS NOT NULL GROUP BY l.ville")
+    java.util.List<Object[]> countLabosByVille();
 }

@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
+
 @Repository
 public interface AdminUserRepository extends JpaRepository<User, Long> {
 
@@ -86,4 +89,27 @@ public interface AdminUserRepository extends JpaRepository<User, Long> {
             @Param("role") String role,
             @Param("specialite") String specialite,
             Pageable pageable);
+
+    // --- Dashboard Admin : Nouvelles inscriptions par rôle et mois ---
+    @Query(value = "SELECT MONTH(u.created_at) AS mois, COUNT(u.id) AS total " +
+                   "FROM `user` u " +
+                   "JOIN user_role ur ON u.id = ur.user_id " +
+                   "JOIN roles r ON ur.role_id = r.id " +
+                   "WHERE r.name = :role AND YEAR(u.created_at) = :year " +
+                   "AND u.created_at IS NOT NULL " +
+                   "GROUP BY MONTH(u.created_at) ORDER BY MONTH(u.created_at)",
+           nativeQuery = true)
+    List<Object[]> countNewUsersByRoleAndMonth(@Param("role") String role, @Param("year") int year);
+
+    // --- Dashboard Admin : Demandes en attente ---
+    @Query(value = "SELECT COUNT(u.id) FROM `user` u WHERE u.status = 'PENDING'",
+           nativeQuery = true)
+    long countTotalPending();
+
+    @Query(value = "SELECT COUNT(u.id) FROM `user` u " +
+                   "JOIN user_role ur ON u.id = ur.user_id " +
+                   "JOIN roles r ON ur.role_id = r.id " +
+                   "WHERE u.status = 'PENDING' AND r.name = :role",
+           nativeQuery = true)
+    long countPendingByRole(@Param("role") String role);
 }

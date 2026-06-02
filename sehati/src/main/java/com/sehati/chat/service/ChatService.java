@@ -57,6 +57,16 @@ public class ChatService {
         throw new BusinessException("Aucun interlocuteur actif trouvé pour la conversation.");
     }
 
+    /**
+     * Returns the email (= Spring Security principal name) of a user by their ID.
+     * Used by ChatController to resolve the correct STOMP user destination.
+     */
+    public String getUserEmail(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Utilisateur introuvable"))
+                .getEmail();
+    }
+
     public CounterpartDTO getCounterpartInfo(Long currentUserId) {
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new BusinessException("Utilisateur introuvable"));

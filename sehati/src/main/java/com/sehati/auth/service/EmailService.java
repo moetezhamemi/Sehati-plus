@@ -8,4 +8,5 @@ public interface EmailService {
     void sendAccountDeactivatedEmail(String toEmail);
     void sendRequestApprovedEmail(String toEmail);
     void sendRequestRejectedEmail(String toEmail);
+    void sendSupportReplyEmail(String toEmail, String originalSubject, String replyText);
 }

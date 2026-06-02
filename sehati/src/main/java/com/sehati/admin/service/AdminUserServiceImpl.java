@@ -1,5 +1,4 @@
 package com.sehati.admin.service;
-
 import com.sehati.admin.dto.*;
 import com.sehati.admin.repository.AdminUserRepository;
 import com.sehati.auth.entities.User;
@@ -8,17 +7,13 @@ import com.sehati.common.dto.WorkHoursDTO;
 import com.sehati.common.entities.DaySchedule;
 import com.sehati.common.entities.PhoneNumber;
 import com.sehati.common.entities.WorkHours;
-import com.sehati.laboratoire.entities.Laboratoire;
 import com.sehati.laboratoire.repository.LaboratoireRepository;
-import com.sehati.medecin.entities.Medecin;
 import com.sehati.medecin.repository.MedecinRepository;
-import com.sehati.patient.entities.Patient;
 import com.sehati.patient.repository.PatientRepository;
 import com.sehati.review.dto.RatingSummaryDTO;
 import com.sehati.review.entities.TargetType;
 import com.sehati.review.repository.ReviewRepository;
 import com.sehati.secretaire.entities.MedecinSecretaire;
-import com.sehati.secretaire.entities.Secretaire;
 import com.sehati.secretaire.repository.MedecinSecretaireRepository;
 import com.sehati.secretaire.repository.SecretaireRepository;
 import com.sehati.auth.service.EmailService;

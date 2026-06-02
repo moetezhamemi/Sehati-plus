@@ -51,7 +51,7 @@ public class NotificationEmailService {
         String timeFormatted = appointment.getTime().format(TIME_FMT);
 
         String delayText = "24h".equals(reminderType) ? "dans 24 heures" : "dans 2 heures";
-        String subject = "Sehhati+ : Rappel de votre rendez-vous " + delayText;
+        String subject = "Sehati+ : Rappel de votre rendez-vous " + delayText;
 
         String htmlMsg = buildEmailLayout(
                 "Rappel de rendez-vous",
@@ -82,7 +82,7 @@ public class NotificationEmailService {
         String dateFormatted = appointment.getDate().format(DATE_FMT);
         String timeFormatted = appointment.getTime().format(TIME_FMT);
 
-        String subject = "Sehhati+ : Votre rendez-vous a été annulé";
+        String subject = "Sehati+ : Votre rendez-vous a été annulé";
 
         String htmlMsg = buildEmailLayout(
                 "Rendez-vous annulé",
@@ -111,7 +111,7 @@ public class NotificationEmailService {
         String labName = appointment.getLaboratoire() != null ? appointment.getLaboratoire().getNomLabo() : "Votre laboratoire";
         String dateFormatted = appointment.getDate().format(DATE_FMT);
 
-        String subject = "Sehhati+ : Vos résultats d'analyses sont disponibles";
+        String subject = "Sehati+ : Vos résultats d'analyses sont disponibles";
 
         String htmlMsg = buildEmailLayout(
                 "Résultats disponibles",
@@ -185,7 +185,7 @@ public class NotificationEmailService {
           .append("</style></head><body>")
           .append("<div class=\"container\">")
           .append("<div class=\"header\">")
-          .append("<h1>Sehhati+</h1>")
+          .append("<h1>Sehati+</h1>")
           .append("<p>").append(title).append("</p>")
           .append("</div>")
           .append("<div class=\"content\">")
@@ -199,8 +199,8 @@ public class NotificationEmailService {
 
         sb.append("</div>")
           .append("<div class=\"footer\">")
-          .append("<p>Cet e-mail a été envoyé automatiquement par la plateforme Sehhati+.</p>")
-          .append("<p>© 2026 Sehhati+. Tous droits réservés.</p>")
+          .append("<p>Cet e-mail a été envoyé automatiquement par la plateforme Sehati+.</p>")
+          .append("<p>© 2026 Sehati+. Tous droits réservés.</p>")
           .append("</div>")
           .append("</div>")
           .append("</body></html>");

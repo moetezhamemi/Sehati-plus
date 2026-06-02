@@ -108,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Bienvenue sur Sehhati+',
+                'Bienvenue sur Sehati+',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 24,
