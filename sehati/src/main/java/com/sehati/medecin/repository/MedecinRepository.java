@@ -17,9 +17,9 @@ public interface MedecinRepository extends JpaRepository<Medecin, Long> {
     Page<Medecin> findAllApprovedAndEnabled(Pageable pageable);
 
     @Query("SELECT m FROM Medecin m JOIN m.user u LEFT JOIN m.specialite s WHERE u.enabled = true AND u.status = 'APPROVED' " +
-           "AND (:search IS NULL OR LOWER(m.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(m.prenom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(CONCAT(m.nom, ' ', m.prenom)) LIKE LOWER(CONCAT('%', :search, '%'))) " +
-           "AND (:ville IS NULL OR LOWER(m.ville) = LOWER(:ville)) " +
-           "AND (:specialite IS NULL OR LOWER(s.nom) = LOWER(:specialite))")
+           "AND (:search IS NULL OR LOWER(m.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(m.prenom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(CONCAT(m.nom, ' ', m.prenom)) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(CONCAT(m.prenom, ' ', m.nom)) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:ville IS NULL OR LOWER(m.ville) LIKE LOWER(CONCAT('%', :ville, '%'))) " +
+           "AND (:specialite IS NULL OR LOWER(s.nom) LIKE LOWER(CONCAT('%', :specialite, '%')))")
     Page<Medecin> searchApproved(@org.springframework.data.repository.query.Param("search") String search, 
                                  @org.springframework.data.repository.query.Param("ville") String ville, 
                                  @org.springframework.data.repository.query.Param("specialite") String specialite, 

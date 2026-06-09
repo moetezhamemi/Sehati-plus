@@ -29,7 +29,9 @@ public class NotificationEmailService {
     @Value("${sehati.frontend.base-url:http://localhost:4200}")
     private String frontendBaseUrl;
 
-    private static final String FROM_EMAIL = "sahhati.plus@gmail.com";
+    @Value("${sehati.mail.from}")
+    private String fromEmail;
+
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale.FRENCH);
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -213,7 +215,7 @@ public class NotificationEmailService {
             MimeMessage mimeMessage = emailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
 
-            helper.setFrom(FROM_EMAIL);
+            helper.setFrom(fromEmail);
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(htmlContent, true);

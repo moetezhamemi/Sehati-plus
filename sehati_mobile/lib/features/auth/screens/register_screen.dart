@@ -361,7 +361,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         });
                       },
                       title: Text(
-                        'J\'accepte les conditions d\'utilisation et la politique de confidentialité',
+                        'J\'accepte les CGU & Politique de confidentialité',
                         style: TextStyle(fontSize: 14, color: AppColors.textDark),
                       ),
                       controlAffinity: ListTileControlAffinity.leading,

@@ -16,7 +16,7 @@ public interface LaboratoireRepository extends JpaRepository<Laboratoire, Long> 
     Page<Laboratoire> findAllApprovedAndEnabled(Pageable pageable);
 
     @Query("SELECT l FROM Laboratoire l JOIN l.user u WHERE u.enabled = true AND u.status = 'APPROVED' " +
-           "AND (:search IS NULL OR LOWER(l.nomLabo) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:search IS NULL OR LOWER(l.nomLabo) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(l.responsable) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:ville IS NULL OR LOWER(l.ville) = LOWER(:ville))")
     Page<Laboratoire> searchApproved(@org.springframework.data.repository.query.Param("search") String search, 
                                      @org.springframework.data.repository.query.Param("ville") String ville, 

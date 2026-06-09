@@ -8,18 +8,19 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+
   mysql:
     image: mysql:8.0
     container_name: sehati-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: Sehati_db
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "-uroot", "-proot", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "-uroot", "-p${MYSQL_ROOT_PASSWORD}", "ping", "-h", "localhost"]
       timeout: 20s
       retries: 10
 
@@ -28,7 +29,7 @@ services:
     container_name: sehati-phpmyadmin
     environment:
       PMA_HOST: mysql
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
       - "8081:80"
     depends_on:
@@ -40,23 +41,31 @@ services:
     container_name: sehati-backend
     ports:
       - "6060:6060"
+    env_file:
+      - .env
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/Sehati_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=root
-      - SEHATI_APP_JWTSECRET=q3t6w9z$C&F)J@NcQfTjWnZr4u7x!A%D*G-KaPdSgUkXp2s5v8y/B?E(H+MbQeTh
-      - SEHATI_APP_JWTEXPIRATIONMS=86400000
-      - SPRING_MAIL_HOST=smtp.gmail.com
-      - SPRING_MAIL_PORT=587
-      - SPRING_MAIL_USERNAME=sehhati.plus@gmail.com
-      - SPRING_MAIL_PASSWORD=jnpz miiq tysw axkc
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - SEHATI_APP_JWTSECRET=${SEHATI_APP_JWTSECRET}
+      - SEHATI_APP_JWTEXPIRATIONMS=${SEHATI_APP_JWTEXPIRATIONMS}
+      - SPRING_MAIL_HOST=${SPRING_MAIL_HOST}
+      - SPRING_MAIL_PORT=${SPRING_MAIL_PORT}
+      - SPRING_MAIL_USERNAME=${SPRING_MAIL_USERNAME}
+      - SPRING_MAIL_PASSWORD=${SPRING_MAIL_PASSWORD}
       - SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
       - SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
-      - CLOUDINARY_CLOUD_NAME=dbwruk8kt
-      - CLOUDINARY_API_KEY=618329299139744
-      - CLOUDINARY_API_SECRET=_FqZPiHkdG3ghrCozlOQEEnxmwg
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=6379
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_SERVICE_SID=${TWILIO_SERVICE_SID}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SPRING_DATA_REDIS_HOST=${SPRING_DATA_REDIS_HOST}
+      - SPRING_DATA_REDIS_PORT=${SPRING_DATA_REDIS_PORT}
+      - SEHATI_FRONTEND_BASE_URL=${SEHATI_FRONTEND_BASE_URL}
+      - SEHATI_MAIL_FROM=${SEHATI_MAIL_FROM}
     depends_on:
       mysql:
         condition: service_healthy

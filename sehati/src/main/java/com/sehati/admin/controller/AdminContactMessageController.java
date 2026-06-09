@@ -30,11 +30,11 @@ public class AdminContactMessageController {
             @RequestParam(required = false) MessageStatus status,
             @RequestParam(required = false) String subject,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        
+            @RequestParam(defaultValue = "30") int size) {
+
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<ContactMessage> messages = service.getMessages(status, subject, pageable);
-        
+
         return ResponseEntity.ok(ApiResponse.success("Success", messages));
     }
 
